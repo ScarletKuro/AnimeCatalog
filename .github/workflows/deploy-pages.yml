@@ -1,0 +1,133 @@
+name: Build, Test & Deploy GitHub Pages
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: 10.0.x
+  APP_PROJECT: src/AnimeCatalog/AnimeCatalog.csproj
+  TEST_PROJECT: src/tests/AnimeCatalog.Tests/AnimeCatalog.Tests.csproj
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore ${{ env.TEST_PROJECT }}
+
+      - name: Test
+        run: >-
+          dotnet test ${{ env.TEST_PROJECT }}
+          -c Release
+          --no-restore
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**
+          retention-days: 7
+
+  build:
+    name: Build & Publish
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Restore
+        run: dotnet restore ${{ env.APP_PROJECT }}
+
+      - name: Publish
+        run: dotnet publish ${{ env.APP_PROJECT }} -c Release --no-restore -o publish
+
+      - name: Rewrite base href
+        run: |
+          BASE="${GITHUB_REPOSITORY#*/}"
+          sed -i "s|<base href=\"/\" />|<base href=\"/$BASE/\" />|" publish/wwwroot/index.html
+          grep -q "<base href=\"/$BASE/\" />" publish/wwwroot/index.html \
+            || { echo "::error::base href rewrite failed - check the <base> tag in wwwroot/index.html"; exit 1; }
+
+      - name: Add .nojekyll
+        run: touch publish/wwwroot/.nojekyll
+
+      - name: Verify published assets
+        run: |
+          for f in index.html 404.html css/app.css appsettings.json .nojekyll; do
+            test -e "publish/wwwroot/$f" || { echo "::error::missing: $f"; exit 1; }
+          done
+          for f in index.html 404.html css/app.css appsettings.json; do
+            test -s "publish/wwwroot/$f" || { echo "::error::empty: $f"; exit 1; }
+          done
+          test -d publish/wwwroot/_framework || { echo "::error::missing _framework"; exit 1; }
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: publish/wwwroot
+          include-hidden-files: true
+
+  deploy:
+    name: Deploy
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

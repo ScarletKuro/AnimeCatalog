@@ -1,0 +1,81 @@
+<button type="button" class="@ButtonClass" aria-pressed="@IsSelected" @onclick="() => OnSelected.InvokeAsync(Media)">
+    <span class="search-result__poster">
+        <img src="@CoverUrl" alt="@Title cover" loading="lazy" />
+    </span>
+    <div class="search-result__content">
+        <div class="search-result__title">@Title</div>
+
+        @if (!string.IsNullOrWhiteSpace(Media.Title.English) &&
+            !string.IsNullOrWhiteSpace(Media.Title.Romaji) &&
+            !string.Equals(Media.Title.English, Media.Title.Romaji, StringComparison.Ordinal))
+        {
+            <div class="search-result__subtitle">@Media.Title.Romaji</div>
+        }
+
+        <div class="search-result__meta">
+            @if (!string.IsNullOrWhiteSpace(Media.Format))
+            {
+                <span>@Media.Format</span>
+            }
+
+            @if (Media.SeasonYear is not null)
+            {
+                <span>@Media.SeasonYear</span>
+            }
+
+            @if (IsInCatalog)
+            {
+                <span class="chip chip--muted">In catalog</span>
+            }
+        </div>
+    </div>
+    <div class="search-result__indicator" aria-hidden="true">
+        <span class="search-result__indicator-dot"></span>
+    </div>
+</button>
+
+@code {
+    [Parameter, EditorRequired]
+    public required AnimeCatalog.Models.AniList.AniListMedia Media { get; set; }
+
+    [Parameter]
+    public bool IsSelected { get; set; }
+
+    /// <summary>
+    /// The local anime entry id when this AniList result is already in the catalog. Left null, the
+    /// result renders exactly as it did before.
+    /// </summary>
+    [Parameter]
+    public long? ExistingAnimeEntryId { get; set; }
+
+    [Parameter]
+    public EventCallback<AnimeCatalog.Models.AniList.AniListMedia> OnSelected { get; set; }
+
+    private bool IsInCatalog => ExistingAnimeEntryId is not null;
+
+    private string Title => Media.Title.English ?? Media.Title.Romaji ?? Media.Id.ToString();
+
+    private string? CoverUrl => Media.CoverImage?.Large ?? Media.CoverImage?.ExtraLarge;
+
+    private string ButtonClass
+    {
+        get
+        {
+            // Both modifiers can apply at once: an already-added result stays selectable, because
+            // picking it is how the add page surfaces its related-anime list.
+            var classes = new List<string>(3) { "search-result" };
+
+            if (IsSelected)
+            {
+                classes.Add("search-result--selected");
+            }
+
+            if (IsInCatalog)
+            {
+                classes.Add("search-result--cataloged");
+            }
+
+            return string.Join(' ', classes);
+        }
+    }
+}

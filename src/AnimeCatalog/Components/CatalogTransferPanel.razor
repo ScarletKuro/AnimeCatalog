@@ -1,0 +1,129 @@
+@using System.Text.Json
+@using AnimeCatalog.Models.Transfer
+@inject CatalogTransferService CatalogTransferService
+@inject BrowserStorageService BrowserStorage
+
+<section class="panel">
+    <div class="panel__header">
+        <div>
+            <h2>Backup and restore</h2>
+            <p class="lede">Export the whole catalog as portable JSON, or merge a backup back in. Importing never deletes: entries missing from the file are left untouched.</p>
+        </div>
+    </div>
+
+    <div class="transfer-grid">
+        <div class="field">
+            <span class="field-label">Export</span>
+            <button type="button" class="button button--primary" disabled="@_isBusy" @onclick="ExportAsync">
+                @(_isExporting ? "Preparing..." : "Download backup")
+            </button>
+        </div>
+
+        <label class="field">
+            <span class="field-label">Import</span>
+            <InputFile class="file-input" accept=".json,application/json" OnChange="ImportAsync" disabled="@_isBusy" />
+        </label>
+    </div>
+
+    @if (_isImporting)
+    {
+        <LoadingIndicator Text="Importing backup..." />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Transfer failed" Message="@_error" />
+    }
+
+    @if (_result is not null)
+    {
+        <div class="transfer-result">
+            <div class="stat-row"><span>Franchises</span><strong>@_result.FranchisesCreated added · @_result.FranchisesUpdated updated</strong></div>
+            <div class="stat-row"><span>Anime entries</span><strong>@_result.EntriesCreated added · @_result.EntriesUpdated updated</strong></div>
+            <div class="stat-row"><span>Relations written</span><strong>@_result.RelationsWritten</strong></div>
+
+            @if (_result.Skipped.Count > 0)
+            {
+                <div class="transfer-result__skipped">
+                    <strong>@_result.Skipped.Count skipped</strong>
+                    <ul>
+                        @foreach (var reason in _result.Skipped)
+                        {
+                            <li>@reason</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    // A few hundred entries comfortably exceeds InputFile's 512 KB default cap.
+    private const long MaxImportBytes = 10 * 1024 * 1024;
+
+    private bool _isExporting;
+    private bool _isImporting;
+    private string? _error;
+    private CatalogImportResult? _result;
+
+    private bool _isBusy => _isExporting || _isImporting;
+
+    [Parameter]
+    public EventCallback OnImported { get; set; }
+
+    private async Task ExportAsync()
+    {
+        try
+        {
+            _isExporting = true;
+            _error = null;
+            _result = null;
+
+            var file = await CatalogTransferService.ExportAsync();
+            var json = JsonSerializer.Serialize(file, CatalogTransferService.JsonOptions);
+
+            await BrowserStorage.DownloadFileAsync(
+                $"anime-catalog-{DateTime.UtcNow:yyyy-MM-dd}.json",
+                "application/json",
+                json);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            _isImporting = true;
+            _error = null;
+            _result = null;
+
+            await using var stream = args.File.OpenReadStream(MaxImportBytes);
+            var file = await JsonSerializer.DeserializeAsync<CatalogExportFile>(stream, CatalogTransferService.JsonOptions)
+                ?? throw new InvalidOperationException("The selected file is empty or not a catalog backup.");
+
+            _result = await CatalogTransferService.ImportAsync(file);
+
+            if (OnImported.HasDelegate)
+            {
+                await OnImported.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
+}

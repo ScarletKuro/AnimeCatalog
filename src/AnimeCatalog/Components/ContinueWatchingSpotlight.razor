@@ -1,0 +1,104 @@
+@* The home page's lead: the entry you touched most recently, with its progress and a way back in.
+   Deliberately not BannerHero — that component owns a page <h1> and overhangs its poster into a
+   banner band, whereas this is one section under the page heading. The poster is a ratio-locked
+   figure so its crop never depends on how the text beside it wraps. *@
+<article class="home-spotlight @(HasBanner ? "home-spotlight--banner" : null)">
+    @if (HasBanner)
+    {
+        @* Decorative: the title is right beside it, so announcing the artwork adds nothing. *@
+        <img class="home-spotlight__banner" src="@BannerUrl" alt="" loading="lazy" />
+        <div class="home-spotlight__scrim" aria-hidden="true"></div>
+    }
+
+    <figure class="home-spotlight__poster">
+        @if (!string.IsNullOrWhiteSpace(Item.AnimeEntry.CoverUrl))
+        {
+            <img src="@Item.AnimeEntry.CoverUrl" alt="@($"{Item.PrimaryTitle} cover")" loading="lazy" />
+        }
+        else
+        {
+            <div class="poster-fallback" aria-hidden="true">@Initial</div>
+        }
+    </figure>
+
+    <div class="home-spotlight__body">
+        <p class="eyebrow">Continue watching</p>
+        <h2 class="home-spotlight__title">@Item.PrimaryTitle</h2>
+
+        @if (!string.IsNullOrWhiteSpace(SubtitleText))
+        {
+            <p class="home-spotlight__sub">@SubtitleText</p>
+        }
+
+        <StatMeter Label="Episodes watched"
+                   Value="Item.CatalogEntry.EpisodesWatched"
+                   Max="@(Item.AnimeEntry.Episodes ?? Item.CatalogEntry.EpisodesWatched)"
+                   ValueText="@EpisodesText"
+                   Variant="success" />
+
+        <div class="home-spotlight__meta">
+            <StatusBadge Status="Item.CatalogEntry.Status" />
+            <RatingDisplay Score="Item.CatalogEntry.Score" />
+            @if (CommunityScore is not null)
+            {
+                <span class="chip chip--neutral">AniList @CommunityScore / 100</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(AiringText))
+            {
+                <span class="chip chip--live">@AiringText</span>
+            }
+        </div>
+
+        <div class="button-row">
+            <NavLink href="@($"anime/{Item.AnimeEntry.Id}")" class="button button--primary">Resume</NavLink>
+            @if (!string.IsNullOrWhiteSpace(Item.Franchise?.Slug))
+            {
+                <NavLink href="@($"franchise/{Item.Franchise.Slug}")" class="button button--ghost">Open franchise</NavLink>
+            }
+        </div>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public required AnimeListItemViewModel Item { get; set; }
+
+    /// <summary>Optional AniList banner, used as a background wash. The card is complete without it.</summary>
+    [Parameter]
+    public string? BannerUrl { get; set; }
+
+    /// <summary>Optional next-episode line from AniList, e.g. "Episode 18 on 2026-08-21 18:30".</summary>
+    [Parameter]
+    public string? AiringText { get; set; }
+
+    /// <summary>AniList's community average, 0-100. Shown with its unit so it cannot read as /10.</summary>
+    [Parameter]
+    public int? CommunityScore { get; set; }
+
+    private bool HasBanner => !string.IsNullOrWhiteSpace(BannerUrl);
+
+    private string? SubtitleText
+    {
+        get
+        {
+            var parts = new[]
+            {
+                MediaDisplayFormatter.FormatAndYear(Item.AnimeEntry.Format, Item.AnimeEntry.SeasonYear),
+                Item.Franchise?.Title
+            };
+
+            var text = string.Join(" · ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+    }
+
+    // Mirrors ProgressDisplay: an unknown episode count states what you have watched rather than
+    // inventing a denominator.
+    private string EpisodesText => Item.AnimeEntry.Episodes is > 0
+        ? $"{Item.CatalogEntry.EpisodesWatched} / {Item.AnimeEntry.Episodes}"
+        : $"{Item.CatalogEntry.EpisodesWatched} watched";
+
+    private string Initial => string.IsNullOrWhiteSpace(Item.PrimaryTitle)
+        ? "?"
+        : Item.PrimaryTitle.Trim()[..1].ToUpperInvariant();
+}

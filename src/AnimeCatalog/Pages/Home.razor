@@ -1,0 +1,481 @@
+@page "/"
+@implements IDisposable
+@inject CatalogService CatalogService
+@inject IAniListEnrichmentService EnrichmentService
+
+<PageTitle>Anime Catalog</PageTitle>
+
+<section class="stack stack--wide">
+    @* Outside the state branches on purpose: Routes.razor focuses the h1 after navigation, so it has
+       to exist during the loading and error states too. No action buttons in here either — the sticky
+       site header right above already links to Catalog and, for an admin, Watch next. *@
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Home</p>
+            <h1>Your collection</h1>
+            <p class="lede">@HeaderLede</p>
+        </div>
+    </div>
+
+    @if (!CatalogService.IsConfigured)
+    {
+        <ErrorState Title="Configuration required" Message="Fill in Supabase and AniList settings in wwwroot/appsettings.json to load the live catalog." />
+    }
+    else if (_accessState == CatalogAccessState.Private)
+    {
+        <PrivateCatalogState />
+    }
+    else if (_isLoading)
+    {
+        <LoadingIndicator Text="Loading summary..." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Home summary failed" Message="@_error" Retry="LoadAsync" />
+    }
+    else if (_summary is null || _summary.TotalEntries == 0)
+    {
+        <div class="empty-card">
+            <h3>Nothing in the catalog yet.</h3>
+            <p>Once entries are added they are summarised here: what is part-way through, how far it has got, and how it has been scored.</p>
+        </div>
+    }
+    else
+    {
+        @if (_summary.Spotlight is not null)
+        {
+            <ContinueWatchingSpotlight Item="_summary.Spotlight"
+                                       BannerUrl="@BannerFor(_summary.Spotlight)"
+                                       AiringText="@AiringTextFor(_summary.Spotlight)"
+                                       CommunityScore="@CommunityScoreFor(_summary.Spotlight)" />
+        }
+        else
+        {
+            <div class="empty-card">
+                <h3>Nothing in progress.</h3>
+                <p>Mark something as watching and it leads this page, with its episode progress and a way straight back to it.</p>
+            </div>
+        }
+
+        @* Not an .error-card: nothing is broken, some optional AniList extras are just missing. *@
+        @if (!string.IsNullOrWhiteSpace(_enrichError))
+        {
+            <p class="panel__notice">AniList extras are unavailable: @_enrichError</p>
+        }
+
+        <div class="stats-grid">
+            <div class="stat-card"><span>Anime entries</span><strong>@_summary.TotalEntries</strong></div>
+            <div class="stat-card"><span>@FranchisesLabel</span><strong>@_summary.FranchiseCount</strong></div>
+            <div class="stat-card"><span>Episodes watched</span><strong>@_summary.EpisodesWatched</strong></div>
+            <div class="stat-card"><span>Average score</span><strong>@(_summary.AverageScore?.ToString("0.0") ?? "—")</strong></div>
+        </div>
+
+        <div class="content-grid home-grid">
+            <section class="panel panel--feature" aria-labelledby="home-progress">
+                <div class="panel__header">
+                    <h2 id="home-progress">Watch progress</h2>
+                </div>
+                <div class="panel__body">
+                    <StatMeter Label="Entries completed"
+                               Value="_summary.CompletedEntries"
+                               Max="_summary.TotalEntries"
+                               ValueText="@($"{_summary.CompletedEntries} / {_summary.TotalEntries}")"
+                               Caption="@($"{_summary.CompletionPercent}% of the catalog is finished.")"
+                               Variant="success" />
+
+                    <StatMeter Label="Episodes watched"
+                               Value="_summary.EpisodesWatched"
+                               Max="@(_summary.EpisodesTotal > 0 ? _summary.EpisodesTotal : _summary.EpisodesWatched)"
+                               ValueText="@EpisodesMeterText" />
+
+                    <StatusBar Breakdown="_summary.StatusBreakdown" Total="_summary.TotalEntries" />
+
+                    <p class="empty-note">@ActivityText</p>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="home-scores">
+                <div class="panel__header">
+                    <h2 id="home-scores">Your scores</h2>
+                    <span class="site-chip">@_summary.ScoredCount scored</span>
+                </div>
+                @if (_summary.ScoreDistribution.Count == 0)
+                {
+                    <p class="empty-note">Nothing scored yet.</p>
+                }
+                else
+                {
+                    <div class="panel__body">
+                        <div class="stat-row"><span>Average</span><strong>@(_summary.AverageScore?.ToString("0.0") ?? "—") / 10</strong></div>
+                        <div class="stat-row"><span>Highest</span><strong>@(_summary.HighestScore?.ToString("0.0") ?? "—") / 10</strong></div>
+
+                        @* One meter per bucket rather than a bespoke chart: StatMeter is already a
+                           labelled, announced bar, so the histogram costs no new CSS. *@
+                        @foreach (var bucket in _summary.ScoreDistribution)
+                        {
+                            <StatMeter Label="@bucket.Score.ToString()"
+                                       Value="bucket.Count"
+                                       Max="LargestScoreBucket"
+                                       ValueText="@BucketText(bucket)"
+                                       Variant="warm" />
+                        }
+
+                        <p class="empty-note">Grouped by whole score, so 8.0 to 8.9 all count as 8.</p>
+                    </div>
+                }
+            </section>
+        </div>
+
+        @if (_summary.ContinueWatching.Count > 0)
+        {
+            <section class="panel" aria-labelledby="home-watching">
+                <div class="panel__header">
+                    <h2 id="home-watching">Also watching</h2>
+                </div>
+                <div class="poster-grid">
+                    @foreach (var item in _summary.ContinueWatching)
+                    {
+                        <PosterCard Title="@item.PrimaryTitle"
+                                    CoverUrl="@item.AnimeEntry.CoverUrl"
+                                    Subtitle="@MediaDisplayFormatter.FormatAndYear(item.AnimeEntry.Format, item.AnimeEntry.SeasonYear)"
+                                    Href="@($"anime/{item.AnimeEntry.Id}")"
+                                    Score="@item.CatalogEntry.Score"
+                                    BadgeText="@AiringBadgeFor(item)"
+                                    BadgeVariant="live"
+                                    ProgressPercent="@ProgressPercent(item)">
+                            <Footer>
+                                <ProgressDisplay EpisodesWatched="item.CatalogEntry.EpisodesWatched"
+                                                 TotalEpisodes="item.AnimeEntry.Episodes" />
+                            </Footer>
+                        </PosterCard>
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="panel" aria-labelledby="home-completed">
+            <div class="panel__header">
+                <h2 id="home-completed">Recently completed</h2>
+            </div>
+            @if (_summary.RecentlyCompleted.Count == 0)
+            {
+                <p class="empty-note">No completed entries yet.</p>
+            }
+            else
+            {
+                <div class="poster-grid">
+                    @foreach (var item in _summary.RecentlyCompleted)
+                    {
+                        <PosterCard Title="@item.PrimaryTitle"
+                                    CoverUrl="@item.AnimeEntry.CoverUrl"
+                                    Subtitle="@MediaDisplayFormatter.FormatAndYear(item.AnimeEntry.Format, item.AnimeEntry.SeasonYear)"
+                                    Href="@($"anime/{item.AnimeEntry.Id}")"
+                                    Score="@item.CatalogEntry.Score">
+                            <Footer>
+                                <span>@CompletedFooter(item)</span>
+                            </Footer>
+                        </PosterCard>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="panel" aria-labelledby="home-rated">
+            <div class="panel__header">
+                <h2 id="home-rated">Highest rated</h2>
+            </div>
+            @if (_summary.HighestRated.Count == 0)
+            {
+                <p class="empty-note">No scored entries yet.</p>
+            }
+            else
+            {
+                <div class="poster-grid">
+                    @foreach (var item in _summary.HighestRated)
+                    {
+                        <PosterCard Title="@item.PrimaryTitle"
+                                    CoverUrl="@item.AnimeEntry.CoverUrl"
+                                    Subtitle="@MediaDisplayFormatter.FormatAndYear(item.AnimeEntry.Format, item.AnimeEntry.SeasonYear)"
+                                    Href="@($"anime/{item.AnimeEntry.Id}")"
+                                    Score="@item.CatalogEntry.Score">
+                            <Footer>
+                                <StatusBadge Status="item.CatalogEntry.Status" />
+                            </Footer>
+                        </PosterCard>
+                    }
+                </div>
+            }
+        </section>
+
+        @if (_summary.TopFranchises.Count > 0)
+        {
+            <section class="panel" aria-labelledby="home-franchises">
+                <div class="panel__header">
+                    <h2 id="home-franchises">Most-watched franchises</h2>
+                    <NavLink href="catalog" class="button button--inline">All franchises</NavLink>
+                </div>
+                <div class="franchise-grid">
+                    @foreach (var franchise in _summary.TopFranchises)
+                    {
+                        <FranchiseCard Summary="franchise" />
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="panel" aria-labelledby="home-added">
+            <div class="panel__header">
+                <h2 id="home-added">Recently added</h2>
+            </div>
+            @if (_summary.RecentlyAdded.Count == 0)
+            {
+                <p class="empty-note">No catalog entries yet.</p>
+            }
+            else
+            {
+                <div class="poster-grid">
+                    @foreach (var item in _summary.RecentlyAdded)
+                    {
+                        <PosterCard Title="@item.PrimaryTitle"
+                                    CoverUrl="@item.AnimeEntry.CoverUrl"
+                                    Subtitle="@MediaDisplayFormatter.FormatAndYear(item.AnimeEntry.Format, item.AnimeEntry.SeasonYear)"
+                                    Href="@($"anime/{item.AnimeEntry.Id}")"
+                                    Score="@item.CatalogEntry.Score">
+                            <Footer>
+                                <StatusBadge Status="item.CatalogEntry.Status" />
+                            </Footer>
+                        </PosterCard>
+                    }
+                </div>
+            }
+        </section>
+    }
+</section>
+
+@code {
+    private CatalogAccessState _accessState = CatalogAccessState.Available;
+    private bool _isLoading = true;
+    private string? _error;
+    private HomeSummaryViewModel? _summary;
+
+    // AniList extras for the watching entries only, keyed by AniList id. Null until the batch lands,
+    // and every read of it has to tolerate a missing key.
+    private IReadOnlyDictionary<int, AnimeCatalog.Models.AniList.AniListMedia>? _media;
+    private string? _enrichError;
+    private CancellationTokenSource? _cts;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (!CatalogService.IsConfigured)
+        {
+            _accessState = CatalogAccessState.NotConfigured;
+            _isLoading = false;
+            _summary = null;
+            _error = null;
+            return;
+        }
+
+        // Retry re-enters here, so abandon any enrichment still running for the previous attempt.
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _isLoading = true;
+            _accessState = CatalogAccessState.Available;
+            _error = null;
+            _media = null;
+            _enrichError = null;
+            _summary = await CatalogService.GetHomeSummaryAsync(token);
+        }
+        catch (Exception ex) when (CatalogAccess.IsPrivateAccessDenied(ex))
+        {
+            _accessState = CatalogAccessState.Private;
+            _summary = null;
+            _error = null;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _accessState = CatalogAccessState.Error;
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        // Not awaited: everything above is already renderable from Supabase alone.
+        _ = EnrichAsync();
+    }
+
+    /// <summary>
+    /// One batched AniList call covering the spotlight plus the other watching entries — at most seven
+    /// ids, so a single request. Nothing else on the page needs live data. Enrichment must never gate
+    /// or break the page: <c>GetManyAsync</c> already swallows transport errors, and the catch here
+    /// covers the rest.
+    /// </summary>
+    private async Task EnrichAsync()
+    {
+        if (_summary is null || _cts is null)
+        {
+            return;
+        }
+
+        var token = _cts.Token;
+        var aniListIds = WatchingEntries
+            .Select(item => item.AnimeEntry.AniListId)
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        if (aniListIds.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _enrichError = null;
+
+            var media = await EnrichmentService.GetManyAsync(aniListIds, token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _media = media;
+
+            if (media.Count == 0)
+            {
+                _enrichError = "AniList returned no data for these entries.";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigation or a retry; nothing to report.
+        }
+        catch (Exception ex)
+        {
+            _enrichError = ex.Message;
+        }
+        finally
+        {
+            if (_cts is not null && !_cts.IsCancellationRequested)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    private IEnumerable<AnimeListItemViewModel> WatchingEntries
+    {
+        get
+        {
+            if (_summary is null)
+            {
+                return [];
+            }
+
+            return _summary.Spotlight is null
+                ? _summary.ContinueWatching
+                : _summary.ContinueWatching.Prepend(_summary.Spotlight);
+        }
+    }
+
+    private AnimeCatalog.Models.AniList.AniListMedia? MediaFor(AnimeListItemViewModel item) =>
+        _media is not null && _media.TryGetValue(item.AnimeEntry.AniListId, out var media) ? media : null;
+
+    private string? BannerFor(AnimeListItemViewModel item) => MediaFor(item)?.BannerImage;
+
+    private int? CommunityScoreFor(AnimeListItemViewModel item) => MediaFor(item)?.AverageScore;
+
+    // Same wording and local-time conversion as the details page's "Next episode" fact.
+    private string? AiringTextFor(AnimeListItemViewModel item)
+    {
+        var next = MediaFor(item)?.NextAiringEpisode;
+        if (next is null)
+        {
+            return null;
+        }
+
+        var airsAt = DateTimeOffset.FromUnixTimeSeconds(next.AiringAt).ToLocalTime();
+        return $"Episode {next.Episode} on {airsAt:yyyy-MM-dd HH:mm}";
+    }
+
+    // The poster tile has no room for the full airing line, so it carries the fact and the card's
+    // details page carries the date.
+    private string? AiringBadgeFor(AnimeListItemViewModel item) =>
+        MediaFor(item)?.NextAiringEpisode is null ? null : "Airing";
+
+    // Null rather than 0% when the episode count is unknown: an empty bar would claim no progress.
+    private static int? ProgressPercent(AnimeListItemViewModel item)
+    {
+        var total = item.AnimeEntry.Episodes;
+        if (total is null or <= 0)
+        {
+            return null;
+        }
+
+        return (int)Math.Round(Math.Min(item.CatalogEntry.EpisodesWatched, total.Value) / (double)total.Value * 100);
+    }
+
+    private static string CompletedFooter(AnimeListItemViewModel item) =>
+        item.CatalogEntry.CompletedAt is { } completed
+            ? completed.ToString("yyyy-MM-dd")
+            : "Completed";
+
+    private static string BucketText(ScoreBucket bucket) =>
+        bucket.Count == 1 ? "1 entry" : $"{bucket.Count} entries";
+
+    private string HeaderLede => _summary is null || _summary.TotalEntries == 0
+        ? "A franchise-aware record of what has been watched, scored and left in progress."
+        : $"{_summary.TotalEntries} entries across {_summary.FranchiseCount} franchises, {_summary.CompletionPercent}% finished.";
+
+    // Standalone entries belong in the label, not the headline number: "12 +3" beside the word
+    // "Franchises" reads as one ambiguous figure rather than two separate counts.
+    private string FranchisesLabel => _summary is { StandaloneCount: > 0 }
+        ? $"Franchises · {_summary.StandaloneCount} standalone"
+        : "Franchises";
+
+    // "n+" wherever an entry has no known episode count, so the denominator never reads as exact.
+    private string EpisodesMeterText
+    {
+        get
+        {
+            if (_summary is null)
+            {
+                return "0";
+            }
+
+            var total = _summary.EpisodesTotal > 0
+                ? _summary.EpisodesTotal + (_summary.HasUnknownEpisodeCounts ? "+" : string.Empty)
+                : "?";
+
+            return $"{_summary.EpisodesWatched} / {total}";
+        }
+    }
+
+    private string ActivityText => _summary is null
+        ? string.Empty
+        : _summary.CompletedThisYear == 0 && _summary.CompletedLast30Days == 0
+            ? "Nothing finished yet this year."
+            : $"{_summary.CompletedThisYear} finished this year, {_summary.CompletedLast30Days} in the last 30 days.";
+
+    private double LargestScoreBucket => _summary is null || _summary.ScoreDistribution.Count == 0
+        ? 1
+        : _summary.ScoreDistribution.Max(bucket => bucket.Count);
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

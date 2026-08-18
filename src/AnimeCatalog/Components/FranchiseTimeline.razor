@@ -1,0 +1,43 @@
+@* Release-order chronology. Built from season/year on AnimeEntry, so it needs no AniList data. *@
+@if (Groups.Count == 0)
+{
+    <p class="empty-note">No dated entries to place on a timeline.</p>
+}
+else
+{
+    <ol class="timeline">
+        @foreach (var group in Groups)
+        {
+            <li class="timeline__group">
+                <div class="timeline__gutter">
+                    <h3 class="timeline__year">@group.Label</h3>
+                    <span class="timeline__marker" aria-hidden="true"></span>
+                </div>
+                <ul class="timeline__items">
+                    @foreach (var entry in group.Entries)
+                    {
+                        <li class="timeline__item">
+                            <NavLink class="timeline__title" href="@($"anime/{entry.AnimeEntry.Id}")">@entry.PrimaryTitle</NavLink>
+                            <span class="timeline__tags">
+                                @if (!string.IsNullOrWhiteSpace(entry.AnimeEntry.Season))
+                                {
+                                    <span class="chip chip--muted">@MediaDisplayFormatter.SeasonLabel(entry.AnimeEntry.Season)</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(entry.AnimeEntry.Format))
+                                {
+                                    <span class="chip">@MediaDisplayFormatter.FormatLabel(entry.AnimeEntry.Format)</span>
+                                }
+                                <StatusBadge Status="entry.CatalogEntry.Status" />
+                            </span>
+                        </li>
+                    }
+                </ul>
+            </li>
+        }
+    </ol>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<FranchiseTimelineGroup> Groups { get; set; }
+}

@@ -1,0 +1,107 @@
+<article class="franchise-card @(_expanded ? "franchise-card--expanded" : null)">
+    <div class="franchise-card__poster">
+        @if (!string.IsNullOrWhiteSpace(Summary.CoverUrl))
+        {
+            <img src="@Summary.CoverUrl" alt="@Summary.Title cover" loading="lazy" />
+        }
+        else
+        {
+            <div class="franchise-card__poster-fallback" aria-hidden="true">@GetInitial()</div>
+        }
+
+        @if (Summary.IsWatching)
+        {
+            <span class="franchise-card__live">Watching</span>
+        }
+        @if (Summary.AverageScore is not null)
+        {
+            <div class="franchise-card__rating">
+                <RatingDisplay Score="Summary.AverageScore" />
+            </div>
+        }
+
+        <div class="franchise-card__overlay">
+            <h3 class="franchise-card__title">@Summary.Title</h3>
+            @* The fraction is spelled out for screen readers, which announce "/" as "slash". *@
+            <p class="franchise-card__meta">
+                <span aria-hidden="true">@ProgressLabel</span>
+                <span class="sr-only">@ProgressDescription</span>
+            </p>
+        </div>
+
+        @if (CardHref is not null)
+        {
+            <NavLink href="@CardHref"
+                     class="franchise-card__link"
+                     aria-label="@($"Open {Summary.Title}")"></NavLink>
+        }
+    </div>
+
+    <button type="button" class="franchise-card__toggle"
+            aria-expanded="@_expanded" @onclick="ToggleExpanded">
+        <span>@EntryCountLabel</span>
+        <span class="franchise-card__chevron" aria-hidden="true">
+            <svg viewBox="0 0 20 20" focusable="false">
+                <path d="M5.25 7.5 10 12.25 14.75 7.5" />
+            </svg>
+        </span>
+    </button>
+
+    @if (_expanded)
+    {
+        <div class="franchise-card__entries">
+            <FranchiseEntryList Entries="Summary.VisibleEntries" />
+        </div>
+    }
+</article>
+
+@code {
+    private bool _expanded;
+
+    [Parameter, EditorRequired]
+    public required FranchiseSummaryViewModel Summary { get; set; }
+
+    private void ToggleExpanded()
+    {
+        _expanded = !_expanded;
+    }
+
+    // Progress describes the whole franchise and never the filtered subset. Counting only visible
+    // entries made this useless under a status filter: a "watching" entry is never completed, so it
+    // always read "0 completed" and looked like nothing in the franchise had been finished.
+    private string ProgressLabel => Summary.EntryCount == 0
+        ? "No entries"
+        : $"{Summary.CompletedCount} / {Summary.EntryCount} completed";
+
+    private string ProgressDescription => Summary.EntryCount == 0
+        ? "No entries"
+        : $"{Summary.CompletedCount} of {Summary.EntryCount} entries completed";
+
+    private bool IsNarrowed => Summary.VisibleEntries.Count != Summary.EntryCount;
+
+    // The toggle still promises exactly what expanding reveals, but names the franchise total too so
+    // a narrowed card cannot be mistaken for a one-entry franchise.
+    private string EntryCountLabel => IsNarrowed
+        ? $"{Summary.VisibleEntries.Count} of {Summary.EntryCount} entries"
+        : Summary.VisibleEntries.Count == 1 ? "1 entry" : $"{Summary.VisibleEntries.Count} entries";
+
+    private string GetInitial() =>
+        string.IsNullOrWhiteSpace(Summary.Title) ? "?" : Summary.Title.Trim()[..1].ToUpperInvariant();
+
+    // A franchise card opens the franchise page. An anime with no franchise groups alone in
+    // FranchiseService.BuildCatalog, so its card opens that anime directly.
+    private string? CardHref
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(Summary.Slug))
+            {
+                return $"franchise/{Summary.Slug}";
+            }
+
+            return Summary.VisibleEntries.Count > 0
+                ? $"anime/{Summary.VisibleEntries[0].AnimeEntry.Id}"
+                : null;
+        }
+    }
+}

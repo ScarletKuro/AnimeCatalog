@@ -1,0 +1,411 @@
+@page "/franchise/{Slug}"
+@implements IDisposable
+@inject CatalogService CatalogService
+@inject FranchiseService FranchiseService
+@inject IAniListEnrichmentService EnrichmentService
+
+<PageTitle>@_pageTitle</PageTitle>
+
+<section class="stack stack--wide">
+    @if (!CatalogService.IsConfigured)
+    {
+        <ErrorState Title="Configuration required" Message="Configure Supabase before loading this franchise." />
+    }
+    else if (_accessState == CatalogAccessState.Private)
+    {
+        <PrivateCatalogState />
+    }
+    else if (_isLoading)
+    {
+        <LoadingIndicator Text="Loading franchise..." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Franchise failed" Message="@_error" Retry="LoadAsync" />
+    }
+    else if (_details is null)
+    {
+        <ErrorState Title="Franchise not found" Message="No franchise exists for the provided slug." />
+    }
+    else
+    {
+        <BannerHero BannerUrl="@_enrichment?.BannerUrl"
+                    PosterUrl="@PosterUrl"
+                    Title="@_details.Franchise.Title"
+                    Eyebrow="Franchise">
+            <Badges>
+                <span class="chip">@EntryCountLabel</span>
+                <span class="chip chip--success">@_details.Stats.CompletedCount completed</span>
+                @if (_details.Stats.IsWatching)
+                {
+                    <span class="chip chip--live">Watching now</span>
+                }
+                @if (_details.Stats.YearSpan is not null)
+                {
+                    <span class="chip">@_details.Stats.YearSpan</span>
+                }
+            </Badges>
+            <MetaContent>
+                @if (_formatChips.Count > 0)
+                {
+                    <ChipList Items="_formatChips" Label="Formats in this franchise" />
+                }
+            </MetaContent>
+            <SideContent>
+                <ScoreSplit PersonalScore="_details.Stats.AverageScore"
+                            CommunityScore="_enrichment?.AniListAverageScore"
+                            PersonalLabel="Your average"
+                            CommunityLabel="AniList average" />
+            </SideContent>
+            <Actions>
+                <NavLink href="catalog" class="button button--ghost">Back to catalog</NavLink>
+            </Actions>
+        </BannerHero>
+
+        @if (!string.IsNullOrWhiteSpace(_details.Franchise.Description))
+        {
+            <section class="panel" aria-labelledby="franchise-about">
+                <div class="panel__header"><h2 id="franchise-about">About</h2></div>
+                <ExpandableText Text="@_details.Franchise.Description" CollapsedLines="5" />
+            </section>
+        }
+
+        @if (_enrichError is not null)
+        {
+            <p class="panel__notice">
+                AniList rollups are unavailable, so genres, studios and runtime are hidden. Everything
+                else on this page comes from your catalog.
+                <button type="button" class="button button--inline" @onclick="EnrichAsync">Retry</button>
+            </p>
+        }
+
+        @if (_details.Stats.EntryCount == 0)
+        {
+            <div class="empty-card">
+                <h3>This franchise has no entries yet.</h3>
+                <p>Assign anime to it from the admin editor and they will appear here.</p>
+            </div>
+        }
+        else
+        {
+            @* No stat-card row here on purpose: the banner already states entry count, completed,
+               year span and both averages, and the meters below state progress in proportion. *@
+            <section class="panel panel--feature" aria-labelledby="franchise-progress">
+                <div class="panel__header"><h2 id="franchise-progress">Franchise progress</h2></div>
+                <div class="panel__body">
+                    <StatMeter Label="Entries completed"
+                               Value="_details.Stats.CompletedCount"
+                               Max="_details.Stats.EntryCount"
+                               ValueText="@($"{_details.Stats.CompletedCount} / {_details.Stats.EntryCount}")"
+                               Caption="@($"{_details.Stats.CompletionPercent}% of this franchise is finished.")"
+                               Variant="success" />
+
+                    <StatMeter Label="Episodes watched"
+                               Value="_details.Stats.EpisodesWatched"
+                               Max="@(_details.Stats.EpisodesTotal > 0 ? _details.Stats.EpisodesTotal : _details.Stats.EpisodesWatched)"
+                               ValueText="@EpisodesLabel" />
+
+                    <StatusBar Breakdown="_details.Stats.StatusBreakdown" Total="_details.Stats.EntryCount" />
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="franchise-entries">
+                <div class="panel__header">
+                    <h2 id="franchise-entries">Entries</h2>
+                    <span class="site-chip">@EntryCountLabel</span>
+                </div>
+                <div class="poster-grid" id="franchise-entry-grid">
+                    @foreach (var entry in VisibleEntries)
+                    {
+                        <PosterCard Title="@entry.PrimaryTitle"
+                                    CoverUrl="@entry.AnimeEntry.CoverUrl"
+                                    Subtitle="@MediaDisplayFormatter.FormatAndYear(entry.AnimeEntry.Format, entry.AnimeEntry.SeasonYear)"
+                                    Href="@($"anime/{entry.AnimeEntry.Id}")"
+                                    Score="entry.CatalogEntry.Score"
+                                    BadgeText="@(entry.CatalogEntry.Status == CatalogStatus.Watching ? "Watching" : null)"
+                                    BadgeVariant="live"
+                                    ProgressPercent="@ProgressPercent(entry)">
+                            <Footer>
+                                <StatusBadge Status="entry.CatalogEntry.Status" />
+                                <ProgressDisplay EpisodesWatched="entry.CatalogEntry.EpisodesWatched"
+                                                 TotalEpisodes="entry.AnimeEntry.Episodes" />
+                            </Footer>
+                        </PosterCard>
+                    }
+                </div>
+                @if (_details.Summary.Entries.Count > EntryPreviewCount)
+                {
+                    <DisclosureButton Expanded="_showAllEntries"
+                                      ControlsId="franchise-entry-grid"
+                                      CollapsedLabel="@($"Show all {_details.Summary.Entries.Count} entries")"
+                                      ExpandedLabel="Show fewer entries"
+                                      OnToggle="() => _showAllEntries = !_showAllEntries" />
+                }
+            </section>
+
+            <section class="panel" aria-labelledby="franchise-timeline">
+                <div class="panel__header"><h2 id="franchise-timeline">Chronology</h2></div>
+                <FranchiseTimeline Groups="_details.Timeline" />
+            </section>
+
+            <section class="panel" aria-labelledby="franchise-genres">
+                <div class="panel__header"><h2 id="franchise-genres">Genres</h2></div>
+                @if (_isEnriching)
+                {
+                    <div class="skeleton-stack"><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--w-8"></span></div>
+                }
+                else if (_genreChips.Count == 0)
+                {
+                    <p class="empty-note">No genre data available.</p>
+                }
+                else
+                {
+                    <ChipList Items="_genreChips" Label="Genres across this franchise" />
+                }
+            </section>
+
+            <section class="panel" aria-labelledby="franchise-related">
+                <div class="panel__header"><h2 id="franchise-related">Related anime, not in this franchise</h2></div>
+                @if (ConfirmedRelatedOutside.Count == 0)
+                {
+                    @if (_isEnriching)
+                    {
+                        <div class="poster-grid">
+                            <span class="skeleton skeleton--poster"></span>
+                            <span class="skeleton skeleton--poster"></span>
+                            <span class="skeleton skeleton--poster"></span>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="empty-note">No related anime outside this franchise.</p>
+                    }
+                }
+                else
+                {
+                    <p class="lede">AniList links these titles to entries here, but they are not part of this grouping.</p>
+                    <div class="poster-grid">
+                        @foreach (var relation in ConfirmedRelatedOutside)
+                        {
+                            <PosterCard Title="@relation.Title"
+                                        CoverUrl="@relation.CoverUrl"
+                                        Subtitle="@MediaDisplayFormatter.FormatAndYear(relation.Format, relation.SeasonYear)"
+                                        Href="@relation.Href"
+                                        IsExternal="@(!relation.IsInCatalog)"
+                                        BadgeText="@relation.DisplayLabel"
+                                        BadgeVariant="@(relation.IsInCatalog ? "live" : "warm")" />
+                        }
+                    </div>
+                }
+            </section>
+        }
+    }
+</section>
+
+@code {
+    private const int EntryPreviewCount = 12;
+
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    private CatalogAccessState _accessState = CatalogAccessState.Available;
+    private bool _isLoading = true;
+    private string? _error;
+    private FranchiseDetailsViewModel? _details;
+
+    // Enrichment has its own state so AniList can never gate or break the page.
+    private bool _isEnriching;
+    private string? _enrichError;
+    private FranchiseEnrichmentViewModel? _enrichment;
+    private CancellationTokenSource? _cts;
+
+    private string _pageTitle = "Franchise · Anime Catalog";
+    private IReadOnlyList<ChipItem> _genreChips = [];
+    private IReadOnlyList<RelationLinkViewModel> _relatedOutside = [];
+    private IReadOnlyList<ChipItem> _formatChips = [];
+    private bool _showAllEntries;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (!CatalogService.IsConfigured)
+        {
+            _accessState = CatalogAccessState.NotConfigured;
+            _isLoading = false;
+            return;
+        }
+
+        // OnParametersSetAsync re-fires when navigating between franchises on the same component,
+        // so any enrichment still running for the previous slug must be abandoned.
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _isLoading = true;
+            _accessState = CatalogAccessState.Available;
+            _error = null;
+            _enrichment = null;
+            _enrichError = null;
+            _showAllEntries = false;
+            _genreChips = [];
+            _details = await CatalogService.GetFranchiseAsync(Slug, token);
+            _pageTitle = _details is null
+                ? "Franchise · Anime Catalog"
+                : $"{_details.Franchise.Title} · Franchise · Anime Catalog";
+            _formatChips = BuildFormatChips();
+            // Starts as the Supabase-resolved set: in-catalog targets are confirmed, the rest wait
+            // for enrichment to classify them.
+            _relatedOutside = _details?.RelatedOutsideFranchise ?? [];
+        }
+        catch (Exception ex) when (CatalogAccess.IsPrivateAccessDenied(ex))
+        {
+            _accessState = CatalogAccessState.Private;
+            _details = null;
+            _error = null;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _accessState = CatalogAccessState.Error;
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        if (_details is { Stats.EntryCount: > 0 })
+        {
+            // Not awaited: the page is already renderable from Supabase data.
+            _ = EnrichAsync();
+        }
+    }
+
+    private async Task EnrichAsync()
+    {
+        if (_details is null || _cts is null)
+        {
+            return;
+        }
+
+        var token = _cts.Token;
+        var aniListIds = _details.Summary.Entries.Select(entry => entry.AnimeEntry.AniListId).ToList();
+
+        if (aniListIds.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _isEnriching = true;
+            _enrichError = null;
+            StateHasChanged();
+
+            var media = await EnrichmentService.GetManyAsync(aniListIds, token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _enrichment = FranchiseService.BuildFranchiseEnrichment(_details.Summary.Entries, media);
+            _genreChips = _enrichment.Genres.Select(ToChip).ToList();
+
+            // The relation edges of every entry pooled together are what classify the out-of-catalog
+            // targets: before this, they are unconfirmed and therefore not rendered.
+            _relatedOutside = FranchiseService.MergeLiveRelationData(
+                _details.RelatedOutsideFranchise,
+                media.Values.ToList());
+
+            if (!_enrichment.HasAny)
+            {
+                _enrichError = "AniList returned no data for these entries.";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigation; nothing to report.
+        }
+        catch (Exception ex)
+        {
+            _enrichError = ex.Message;
+        }
+        finally
+        {
+            _isEnriching = false;
+            if (_cts is not null && !_cts.IsCancellationRequested)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    // Counts only mean something once more than one entry contributes.
+    private ChipItem ToChip(LabelCount item) =>
+        new(item.Label, item.Count > 1 ? $"×{item.Count}" : null);
+
+    private IReadOnlyList<ChipItem> BuildFormatChips()
+    {
+        if (_details is null)
+        {
+            return [];
+        }
+
+        return _details.Summary.Entries
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.AnimeEntry.Format))
+            .GroupBy(entry => MediaDisplayFormatter.FormatLabel(entry.AnimeEntry.Format))
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key)
+            .Select(group => new ChipItem(group.Key, group.Count() > 1 ? $"×{group.Count()}" : null, Variant: "muted"))
+            .ToList();
+    }
+
+    private IReadOnlyList<RelationLinkViewModel> ConfirmedRelatedOutside =>
+        _relatedOutside.Where(relation => relation.IsConfirmedAnime).ToList();
+
+    private string? PosterUrl => _details?.Franchise.CoverUrl
+        ?? _details?.Summary.Entries.Select(entry => entry.AnimeEntry.CoverUrl).FirstOrDefault(url => !string.IsNullOrWhiteSpace(url));
+
+    private IEnumerable<AnimeListItemViewModel> VisibleEntries => _showAllEntries
+        ? _details!.Summary.Entries
+        : _details!.Summary.Entries.Take(EntryPreviewCount);
+
+    private string EntryCountLabel => _details!.Stats.EntryCount == 1 ? "1 entry" : $"{_details.Stats.EntryCount} entries";
+
+    private string EpisodesLabel
+    {
+        get
+        {
+            var stats = _details!.Stats;
+            var total = stats.EpisodesTotal > 0
+                ? stats.EpisodesTotal + (stats.HasUnknownEpisodeCounts ? "+" : string.Empty)
+                : "?";
+
+            return $"{stats.EpisodesWatched} / {total}";
+        }
+    }
+
+    private int? ProgressPercent(AnimeListItemViewModel entry)
+    {
+        var total = entry.AnimeEntry.Episodes;
+        if (total is null or <= 0)
+        {
+            return null;
+        }
+
+        return (int)Math.Round(Math.Min(entry.CatalogEntry.EpisodesWatched, total.Value) / (double)total.Value * 100);
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

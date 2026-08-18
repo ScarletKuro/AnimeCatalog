@@ -1,0 +1,749 @@
+@page "/anime/{Id:long}"
+@implements IDisposable
+@inject CatalogService CatalogService
+@inject FranchiseService FranchiseService
+@inject IAniListEnrichmentService EnrichmentService
+@inject AdminCatalogService AdminCatalogService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>@_pageTitle</PageTitle>
+
+<section class="stack stack--wide">
+    @if (!CatalogService.IsConfigured)
+    {
+        <ErrorState Title="Configuration required" Message="Configure Supabase before loading anime details." />
+    }
+    else if (_accessState == CatalogAccessState.Private)
+    {
+        <PrivateCatalogState />
+    }
+    else if (_isLoading)
+    {
+        <LoadingIndicator Text="Loading anime details..." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Anime details failed" Message="@_error" Retry="LoadAsync" />
+    }
+    else if (_details is null)
+    {
+        <ErrorState Title="Anime not found" Message="The requested anime entry does not exist." />
+    }
+    else
+    {
+        @* Toolbar is passed as null for non-admins so the banner renders no empty toolbar pill. *@
+        <BannerHero BannerUrl="@_enrichment?.BannerUrl"
+                    PosterUrl="@_details.AnimeEntry.CoverUrl"
+                    Title="@_details.PrimaryTitle"
+                    Eyebrow="@MediaDisplayFormatter.FormatLabel(_details.AnimeEntry.Format)"
+                    Subtitle="@RomajiSubtitle"
+                    ToolbarLabel="Admin actions"
+                    Toolbar="@(AuthService.IsAdmin ? AdminToolbar : null)">
+            <Badges>
+                <StatusBadge Status="_details.CatalogEntry.Status" />
+                @if (_enrichment?.Media.Status is not null)
+                {
+                    <span class="chip chip--accent">@MediaDisplayFormatter.AiringStatusLabel(_enrichment.Media.Status)</span>
+                }
+                <span class="chip">@EpisodeChipText</span>
+                @if (MediaDisplayFormatter.DurationLabel(_enrichment?.Media.Duration) is { } duration)
+                {
+                    <span class="chip">@duration</span>
+                }
+                @if (_details.AnimeEntry.SeasonYear is not null)
+                {
+                    <span class="chip">@SeasonText</span>
+                }
+            </Badges>
+            <MetaContent>
+                @if (_genreChips.Count > 0)
+                {
+                    <ChipList Items="_genreChips" Max="5" Label="Genres" />
+                }
+                else if (_isEnriching)
+                {
+                    <span class="skeleton skeleton--line skeleton--w-14"></span>
+                }
+            </MetaContent>
+            <SideContent>
+                <ScoreSplit PersonalScore="_details.CatalogEntry.Score"
+                            CommunityScore="_enrichment?.Media.AverageScore" />
+            </SideContent>
+            <Actions>
+                @if (_details.Franchise is not null)
+                {
+                    <NavLink href="@($"franchise/{_details.Franchise.Slug}")" class="button button--ghost">Open franchise</NavLink>
+                }
+                <a class="button button--inline" href="@AniListUrl" target="_blank" rel="noopener noreferrer">
+                    View on AniList<span class="sr-only"> (opens in a new tab)</span>
+                </a>
+            </Actions>
+        </BannerHero>
+
+        @if (_enrichError is not null)
+        {
+            <p class="panel__notice">
+                AniList data could not be loaded, so the synopsis, tags and community scores are hidden.
+                Your catalog data below is unaffected.
+                <button type="button" class="button button--inline" @onclick="EnrichAsync">Retry</button>
+            </p>
+        }
+
+        <div class="details-layout">
+            <aside class="details-layout__rail">
+                <section class="panel" aria-labelledby="anime-your-entry">
+                    <div class="panel__header"><h2 id="anime-your-entry">Your entry</h2></div>
+                    <div class="panel__body">
+                        @if (AuthService.IsAdmin)
+                        {
+                            <div class="field">
+                                <span class="field-label">Status</span>
+                                <CatalogStatusPicker Value="_editStatus" ValueChanged="HandleStatusChangedAsync" />
+                            </div>
+                            <div class="field">
+                                <span class="field-label">Score</span>
+                                <ScorePicker Value="_editScore" ValueChanged="HandleScoreChangedAsync" />
+                            </div>
+                            <label class="field">
+                                <span class="field-label">Episodes watched</span>
+                                <input class="text-input"
+                                       type="number"
+                                       min="0"
+                                       max="@_details.AnimeEntry.Episodes"
+                                       value="@_editEpisodesWatched"
+                                       @onchange="HandleEpisodesChanged" />
+                            </label>
+
+                            <div class="button-row">
+                                <button type="button"
+                                        class="button button--primary"
+                                        disabled="@(!_hasPendingEdits || _isSaving)"
+                                        @onclick="SaveCatalogEntryAsync">
+                                    @(_isSaving ? "Saving..." : "Save changes")
+                                </button>
+                                @if (_saveMessage is not null)
+                                {
+                                    <span class="empty-note">@_saveMessage</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="stat-row">
+                                <StatusBadge Status="_details.CatalogEntry.Status" />
+                                <RatingDisplay Score="_details.CatalogEntry.Score" />
+                            </div>
+                        }
+
+                        <StatMeter Label="Episodes watched"
+                                   Value="_details.CatalogEntry.EpisodesWatched"
+                                   Max="@(_details.AnimeEntry.Episodes ?? _details.CatalogEntry.EpisodesWatched)"
+                                   ValueText="@EpisodeProgressText"
+                                   Variant="success" />
+
+                        <dl class="details-list">
+                            <div><dt>Started</dt><dd>@(_details.CatalogEntry.StartedAt?.ToString("yyyy-MM-dd") ?? "n/a")</dd></div>
+                            <div><dt>Completed</dt><dd>@(_details.CatalogEntry.CompletedAt?.ToString("yyyy-MM-dd") ?? "n/a")</dd></div>
+                            <div><dt>Notes</dt><dd>@(!string.IsNullOrWhiteSpace(_details.CatalogEntry.Notes) ? _details.CatalogEntry.Notes : "No notes.")</dd></div>
+                        </dl>
+                    </div>
+                </section>
+
+                <section class="panel" aria-labelledby="anime-facts">
+                    <div class="panel__header"><h2 id="anime-facts">Facts</h2></div>
+                    <dl class="details-list">
+                        <div><dt>Romaji</dt><dd>@_details.AnimeEntry.TitleRomaji</dd></div>
+                        <div><dt>English</dt><dd>@(_details.AnimeEntry.TitleEnglish ?? "n/a")</dd></div>
+                        <div><dt>Native</dt><dd>@(_details.AnimeEntry.TitleNative ?? "n/a")</dd></div>
+                        <div><dt>Format</dt><dd>@MediaDisplayFormatter.FormatLabel(_details.AnimeEntry.Format)</dd></div>
+                        <div><dt>Season</dt><dd>@SeasonText</dd></div>
+                        <div><dt>Episodes</dt><dd>@(_details.AnimeEntry.Episodes?.ToString() ?? "Unknown")</dd></div>
+                        <div><dt>Dates</dt><dd>@DateRangeText</dd></div>
+                        <div><dt>Studio</dt><dd>@AniListFact(MainStudioText)</dd></div>
+                        <div><dt>Producers</dt><dd>@AniListFact(ProducerText)</dd></div>
+                        <div><dt>Source</dt><dd>@AniListFact(MediaDisplayFormatter.SourceLabel(_enrichment?.Media.Source))</dd></div>
+                        <div><dt>Runtime</dt><dd>@AniListFact(MediaDisplayFormatter.RuntimeLabel(_enrichment?.TotalRuntimeMinutes))</dd></div>
+                        <div><dt>Country</dt><dd>@AniListFact(CountryText)</dd></div>
+                        @if (_enrichment?.Media.Synonyms is { Count: > 0 } synonyms)
+                        {
+                            <div><dt>Also known as</dt><dd>@string.Join(" · ", synonyms.Take(4))</dd></div>
+                        }
+                        @if (NextEpisodeText is not null)
+                        {
+                            <div><dt>Next episode</dt><dd>@NextEpisodeText</dd></div>
+                        }
+                    </dl>
+                </section>
+
+                <section class="panel" aria-labelledby="anime-community">
+                    <div class="panel__header"><h2 id="anime-community">AniList community</h2></div>
+                    @if (_isEnriching)
+                    {
+                        <div class="skeleton-stack">
+                            <span class="skeleton skeleton--line"></span>
+                            <span class="skeleton skeleton--line"></span>
+                            <span class="skeleton skeleton--line skeleton--w-8"></span>
+                        </div>
+                    }
+                    else if (_enrichment is null)
+                    {
+                        <p class="empty-note">Community data unavailable.</p>
+                    }
+                    else
+                    {
+                        <div class="panel__body">
+                            <StatMeter Label="Average score"
+                                       Value="@(_enrichment.Media.AverageScore ?? 0)"
+                                       Max="100"
+                                       ValueText="@ScoreText(_enrichment.Media.AverageScore)" />
+                            <StatMeter Label="Weighted mean"
+                                       Value="@(_enrichment.Media.MeanScore ?? 0)"
+                                       Max="100"
+                                       ValueText="@ScoreText(_enrichment.Media.MeanScore)"
+                                       Variant="warm" />
+                            <ChipList Items="_communityChips" Label="Community counts" />
+                            @if (_rankingChips.Count > 0)
+                            {
+                                <ChipList Items="_rankingChips" Label="Rankings" />
+                            }
+                        </div>
+                    }
+                </section>
+
+            </aside>
+
+            <div class="details-layout__main">
+                <section class="panel" aria-labelledby="anime-synopsis">
+                    <div class="panel__header"><h2 id="anime-synopsis">Synopsis</h2></div>
+                    @if (_isEnriching)
+                    {
+                        <div class="skeleton-stack">
+                            <span class="skeleton skeleton--line"></span>
+                            <span class="skeleton skeleton--line"></span>
+                            <span class="skeleton skeleton--line skeleton--w-8"></span>
+                        </div>
+                    }
+                    else if (_enrichment?.HasDescription != true)
+                    {
+                        <p class="empty-note">No synopsis available.</p>
+                    }
+                    else
+                    {
+                        <ExpandableText Html="@_enrichment.Description.Html" CollapsedLines="7" />
+                    }
+                </section>
+
+                <section class="panel" aria-labelledby="anime-tags">
+                    <div class="panel__header"><h2 id="anime-tags">Genres &amp; tags</h2></div>
+                    @if (_isEnriching)
+                    {
+                        <div class="skeleton-stack"><span class="skeleton skeleton--line"></span><span class="skeleton skeleton--line skeleton--w-8"></span></div>
+                    }
+                    else if (_genreChips.Count == 0 && _tagChips.Count == 0)
+                    {
+                        <p class="empty-note">No genre or tag data available.</p>
+                    }
+                    else
+                    {
+                        <div class="panel__body">
+                            @if (_genreChips.Count > 0)
+                            {
+                                <ChipList Items="_genreChips" Label="Genres" />
+                            }
+                            @if (_tagChips.Count > 0)
+                            {
+                                <ChipList Items="_tagChips" Label="Tags" />
+                            }
+                            @if (_spoilerTagChips.Count > 0)
+                            {
+                                <DisclosureButton Expanded="_showSpoilerTags"
+                                                  ControlsId="anime-spoiler-tags"
+                                                  CollapsedLabel="@($"Show {_spoilerTagChips.Count} spoiler tags")"
+                                                  ExpandedLabel="Hide spoiler tags"
+                                                  OnToggle="() => _showSpoilerTags = !_showSpoilerTags" />
+                                @if (_showSpoilerTags)
+                                {
+                                    <div id="anime-spoiler-tags">
+                                        <ChipList Items="_spoilerTagChips" Label="Spoiler tags" />
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="panel" aria-labelledby="anime-relations">
+                    <div class="panel__header"><h2 id="anime-relations">Related anime</h2></div>
+                    @* Only positively-confirmed anime render. Out-of-catalog targets stay hidden until
+                       AniList classifies them, so a manga or an OST can never appear here. *@
+                    @if (ConfirmedRelations.Count == 0)
+                    {
+                        @if (_isEnriching && UnresolvedRelationCount > 0)
+                        {
+                            <div class="poster-grid">
+                                @for (var index = 0; index < Math.Min(UnresolvedRelationCount, 5); index++)
+                                {
+                                    <span class="skeleton skeleton--poster"></span>
+                                }
+                            </div>
+                        }
+                        else if (UnresolvedRelationCount > 0)
+                        {
+                            <p class="empty-note">Related titles could not be resolved without AniList.</p>
+                        }
+                        else
+                        {
+                            <p class="empty-note">No related anime for this entry.</p>
+                        }
+                    }
+                    else
+                    {
+                        <div class="poster-grid">
+                            @foreach (var relation in ConfirmedRelations)
+                            {
+                                <PosterCard Title="@relation.Title"
+                                            CoverUrl="@relation.CoverUrl"
+                                            Subtitle="@MediaDisplayFormatter.FormatAndYear(relation.Format, relation.SeasonYear)"
+                                            Href="@relation.Href"
+                                            IsExternal="@(!relation.IsInCatalog)"
+                                            BadgeText="@relation.DisplayLabel"
+                                            BadgeVariant="@(relation.IsInCatalog ? "live" : "neutral")">
+                                    <Footer>
+                                        @if (relation.CatalogStatus is not null)
+                                        {
+                                            <StatusBadge Status="relation.CatalogStatus.Value" />
+                                        }
+                                        else
+                                        {
+                                            <span class="empty-note">Not in catalog</span>
+                                        }
+                                    </Footer>
+                                </PosterCard>
+                            }
+                        </div>
+                        @if (_isEnriching && UnresolvedRelationCount > 0)
+                        {
+                            <p class="empty-note">Resolving @UnresolvedRelationCount more...</p>
+                        }
+                    }
+                </section>
+            </div>
+        </div>
+    }
+</section>
+
+<ConfirmDialog
+    IsOpen="_showDeleteDialog"
+    Title="Delete anime entry"
+    Message="This will remove the anime entry, its catalog row, and cached relations."
+    OnCancel="CloseDeleteDialog"
+    OnConfirm="DeleteAsync" />
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private CatalogAccessState _accessState = CatalogAccessState.Available;
+    private bool _isLoading = true;
+    private string? _error;
+    private AnimeDetailsViewModel? _details;
+    private bool _showDeleteDialog;
+
+    // AniList state is tracked separately: it must never gate the page or surface as an ErrorState.
+    private bool _isEnriching;
+    private string? _enrichError;
+    private AnimeEnrichmentViewModel? _enrichment;
+    private CancellationTokenSource? _cts;
+
+    private string _pageTitle = "Anime details · Anime Catalog";
+    private IReadOnlyList<ChipItem> _genreChips = [];
+    private IReadOnlyList<ChipItem> _tagChips = [];
+    private IReadOnlyList<ChipItem> _spoilerTagChips = [];
+    private IReadOnlyList<ChipItem> _communityChips = [];
+    private IReadOnlyList<ChipItem> _rankingChips = [];
+    private bool _showSpoilerTags;
+
+    private CatalogStatus _editStatus;
+    private decimal? _editScore;
+    private int _editEpisodesWatched;
+    private bool _hasPendingEdits;
+    private bool _isSaving;
+    private string? _saveMessage;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (!CatalogService.IsConfigured)
+        {
+            _accessState = CatalogAccessState.NotConfigured;
+            _isLoading = false;
+            return;
+        }
+
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _isLoading = true;
+            _accessState = CatalogAccessState.Available;
+            _error = null;
+            _enrichment = null;
+            _enrichError = null;
+            _saveMessage = null;
+            _showSpoilerTags = false;
+            ResetChips();
+            _details = await CatalogService.GetAnimeDetailsAsync(Id, token);
+            _pageTitle = _details is null
+                ? "Anime details · Anime Catalog"
+                : $"{_details.PrimaryTitle} · Anime Catalog";
+
+            if (_details is not null)
+            {
+                ResetEditState();
+            }
+        }
+        catch (Exception ex) when (CatalogAccess.IsPrivateAccessDenied(ex))
+        {
+            _accessState = CatalogAccessState.Private;
+            _details = null;
+            _error = null;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _accessState = CatalogAccessState.Error;
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        if (_details is not null)
+        {
+            // Not awaited: everything above is already renderable.
+            _ = EnrichAsync();
+        }
+    }
+
+    private async Task EnrichAsync()
+    {
+        if (_details is null || _cts is null)
+        {
+            return;
+        }
+
+        var token = _cts.Token;
+
+        try
+        {
+            _isEnriching = true;
+            _enrichError = null;
+            StateHasChanged();
+
+            var media = await EnrichmentService.GetAsync(_details.AnimeEntry.AniListId, token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (media is null)
+            {
+                _enrichError = "AniList returned no data for this entry.";
+                return;
+            }
+
+            _enrichment = FranchiseService.BuildAnimeEnrichment(media, _details.AnimeEntry.Episodes);
+            BuildChips(_enrichment);
+
+            // Out-of-catalog relations were placeholders until now; give them real titles and covers.
+            _details = new AnimeDetailsViewModel
+            {
+                AnimeEntry = _details.AnimeEntry,
+                CatalogEntry = _details.CatalogEntry,
+                Franchise = _details.Franchise,
+                Relations = FranchiseService.MergeLiveRelationData(_details.Relations, media)
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigation; nothing to report.
+        }
+        catch (Exception ex)
+        {
+            _enrichError = ex.Message;
+        }
+        finally
+        {
+            _isEnriching = false;
+            if (_cts is not null && !_cts.IsCancellationRequested)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void BuildChips(AnimeEnrichmentViewModel enrichment)
+    {
+        _genreChips = enrichment.Media.Genres
+            .Where(genre => !string.IsNullOrWhiteSpace(genre))
+            .Select(genre => new ChipItem(genre, Variant: "accent"))
+            .ToList();
+
+        _tagChips = enrichment.Tags
+            .Select(tag => new ChipItem(tag.Name!, Rank: tag.Rank))
+            .ToList();
+
+        _spoilerTagChips = enrichment.SpoilerTags
+            .Select(tag => new ChipItem(tag.Name!, Rank: tag.Rank, Variant: "muted"))
+            .ToList();
+
+        var media = enrichment.Media;
+        var community = new List<ChipItem>();
+
+        if (media.Popularity is not null)
+        {
+            community.Add(new ChipItem("Popularity", MediaDisplayFormatter.CountLabel(media.Popularity)));
+        }
+
+        if (media.Favourites is not null)
+        {
+            community.Add(new ChipItem("Favourites", MediaDisplayFormatter.CountLabel(media.Favourites), Variant: "warm"));
+        }
+
+        _communityChips = community;
+
+        _rankingChips = enrichment.Rankings
+            .Select(ranking => new ChipItem(
+                MediaDisplayFormatter.RankingLabel(ranking.Rank, ranking.Context, ranking.Year, ranking.AllTime == true),
+                Variant: ranking.AllTime == true ? "warm" : "muted"))
+            .ToList();
+    }
+
+    private void ResetChips()
+    {
+        _genreChips = [];
+        _tagChips = [];
+        _spoilerTagChips = [];
+        _communityChips = [];
+        _rankingChips = [];
+    }
+
+    private void ResetEditState()
+    {
+        _editStatus = _details!.CatalogEntry.Status;
+        _editScore = _details.CatalogEntry.Score;
+        _editEpisodesWatched = _details.CatalogEntry.EpisodesWatched;
+        _hasPendingEdits = false;
+    }
+
+    // Mirrors AnimeEditorForm.HandleStatusChangedAsync so both editors behave identically.
+    private Task HandleStatusChangedAsync(CatalogStatus status)
+    {
+        if (_editStatus == status)
+        {
+            return Task.CompletedTask;
+        }
+
+        _editStatus = status;
+
+        if (status == CatalogStatus.Completed && _details?.AnimeEntry.Episodes is { } episodes)
+        {
+            _editEpisodesWatched = episodes;
+        }
+
+        _hasPendingEdits = true;
+        _saveMessage = null;
+        return Task.CompletedTask;
+    }
+
+    private Task HandleScoreChangedAsync(decimal? score)
+    {
+        if (_editScore == score)
+        {
+            return Task.CompletedTask;
+        }
+
+        _editScore = score;
+        _hasPendingEdits = true;
+        _saveMessage = null;
+        return Task.CompletedTask;
+    }
+
+    private void HandleEpisodesChanged(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var episodes) || episodes < 0)
+        {
+            return;
+        }
+
+        _editEpisodesWatched = episodes;
+        _hasPendingEdits = true;
+        _saveMessage = null;
+    }
+
+    private async Task SaveCatalogEntryAsync()
+    {
+        if (_details is null || !_hasPendingEdits)
+        {
+            return;
+        }
+
+        try
+        {
+            _isSaving = true;
+            _saveMessage = null;
+            await AdminCatalogService.UpdateCatalogEntryAsync(
+                _details.AnimeEntry.Id,
+                _editStatus,
+                _editScore,
+                _editEpisodesWatched);
+
+            await LoadAsync();
+            _saveMessage = "Saved.";
+        }
+        catch (Exception ex)
+        {
+            _saveMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private Task CloseDeleteDialog()
+    {
+        _showDeleteDialog = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshMetadataAsync()
+    {
+        if (_details is null)
+        {
+            return;
+        }
+
+        await AdminCatalogService.RefreshMetadataAsync(_details.AnimeEntry.Id);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_details is null)
+        {
+            return;
+        }
+
+        await AdminCatalogService.DeleteAsync(_details.AnimeEntry.Id);
+        NavigationManager.NavigateTo("catalog");
+    }
+
+    private IReadOnlyList<RelationLinkViewModel> ConfirmedRelations =>
+        _details?.Relations.Where(relation => relation.IsConfirmedAnime).ToList() ?? [];
+
+    // Out-of-catalog targets AniList has not classified yet. Counted so the panel can show progress
+    // while enriching, and admit the gap if enrichment never lands.
+    private int UnresolvedRelationCount =>
+        _details?.Relations.Count(relation => !relation.IsConfirmedAnime) ?? 0;
+
+    private string? RomajiSubtitle => string.Equals(_details!.PrimaryTitle, _details.AnimeEntry.TitleRomaji, StringComparison.Ordinal)
+        ? _details.AnimeEntry.TitleNative
+        : _details.AnimeEntry.TitleRomaji;
+
+    private string AniListUrl => _enrichment?.SiteUrl ?? $"https://anilist.co/anime/{_details!.AnimeEntry.AniListId}";
+
+    private string EpisodeChipText => _details!.AnimeEntry.Episodes is { } episodes
+        ? episodes == 1 ? "1 episode" : $"{episodes} episodes"
+        : "Episodes unknown";
+
+    private string SeasonText => _details!.AnimeEntry.SeasonYear is null
+        ? MediaDisplayFormatter.SeasonLabel(_details.AnimeEntry.Season)
+        : $"{MediaDisplayFormatter.SeasonLabel(_details.AnimeEntry.Season)} {_details.AnimeEntry.SeasonYear}";
+
+    private string DateRangeText =>
+        $"{_details!.AnimeEntry.StartDate?.ToString("yyyy-MM-dd") ?? "?"} → {_details.AnimeEntry.EndDate?.ToString("yyyy-MM-dd") ?? "?"}";
+
+    private string EpisodeProgressText
+    {
+        get
+        {
+            var total = _details!.AnimeEntry.Episodes?.ToString() ?? "?";
+            return $"{_details.CatalogEntry.EpisodesWatched} / {total}";
+        }
+    }
+
+    private string? MainStudioText => _enrichment?.MainStudios.Count > 0
+        ? string.Join(", ", _enrichment.MainStudios.Select(studio => studio.Name))
+        : null;
+
+    private string? ProducerText => _enrichment?.Producers.Count > 0
+        ? string.Join(", ", _enrichment.Producers.Take(4).Select(studio => studio.Name))
+        : null;
+
+    private string? CountryText => _enrichment?.Media.CountryOfOrigin is { } country
+        ? MediaDisplayFormatter.CountryLabel(country)
+        : null;
+
+    private string? NextEpisodeText
+    {
+        get
+        {
+            var next = _enrichment?.Media.NextAiringEpisode;
+            if (next is null)
+            {
+                return null;
+            }
+
+            var airsAt = DateTimeOffset.FromUnixTimeSeconds(next.AiringAt).ToLocalTime();
+            return $"Episode {next.Episode} on {airsAt:yyyy-MM-dd HH:mm}";
+        }
+    }
+
+    // Admin controls for the banner's toolbar slot. "Refresh AniList metadata" is shortened to fit a
+    // toolbar, with the full wording kept for screen readers and as a tooltip.
+    private RenderFragment AdminToolbar => __builder =>
+    {
+        <NavLink href="@($"admin/edit/{_details!.AnimeEntry.Id}")" class="button button--primary">Edit</NavLink>
+        <button type="button"
+                class="button button--ghost"
+                aria-label="Refresh AniList metadata"
+                title="Refresh AniList metadata"
+                @onclick="RefreshMetadataAsync">Refresh</button>
+        <button type="button" class="button button--danger" @onclick="() => _showDeleteDialog = true">Delete</button>
+    };
+
+    // AniList-sourced rows show a shimmer while loading rather than a premature "n/a".
+    private RenderFragment AniListFact(string? value) => __builder =>
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            @value
+        }
+        else if (_isEnriching)
+        {
+            <span class="skeleton skeleton--line skeleton--w-8"></span>
+        }
+        else
+        {
+            @("n/a")
+        }
+    };
+
+    private static string ScoreText(int? score) => score is null ? "n/a" : $"{score} / 100";
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

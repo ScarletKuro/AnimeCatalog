@@ -1,0 +1,65 @@
+<div class="score-picker">
+    <div class="score-picker__controls">
+        <button
+            type="button"
+            class="@(Value is null ? "score-picker__clear score-picker__clear--selected" : "score-picker__clear")"
+            @onclick="ClearAsync">
+            Unrated
+        </button>
+
+        <div class="score-picker__stars" role="radiogroup" aria-label="Score">
+            @foreach (var score in Scores)
+            {
+                var isFilled = Value is not null && score <= Value.Value;
+                var isSelected = Value == score;
+
+                <button
+                    type="button"
+                    class="@(isFilled ? "score-picker__option score-picker__option--filled" : "score-picker__option")"
+                    role="radio"
+                    aria-checked="@isSelected"
+                    aria-label="@($"Set score to {score}")"
+                    title="@($"{score} / 10")"
+                    @onclick="() => SelectAsync(score)">
+                    <span class="score-picker__icon"><StarIcon /></span>
+                </button>
+            }
+        </div>
+    </div>
+
+    <p class="score-picker__value">@CurrentValueLabel</p>
+</div>
+
+@code {
+    private static readonly decimal[] Scores = Enumerable.Range(1, 10).Select(static value => (decimal)value).ToArray();
+
+    [Parameter]
+    public decimal? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<decimal?> ValueChanged { get; set; }
+
+    private string CurrentValueLabel => Value is null ? "Unrated" : $"{Value.Value:0} / 10";
+
+    private async Task SelectAsync(decimal score)
+    {
+        if (Value == score)
+        {
+            return;
+        }
+
+        Value = score;
+        await ValueChanged.InvokeAsync(score);
+    }
+
+    private async Task ClearAsync()
+    {
+        if (Value is null)
+        {
+            return;
+        }
+
+        Value = null;
+        await ValueChanged.InvokeAsync(null);
+    }
+}

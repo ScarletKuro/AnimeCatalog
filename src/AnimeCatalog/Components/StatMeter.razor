@@ -1,0 +1,64 @@
+<div class="stat-meter">
+    @if (ShowHead)
+    {
+        <div class="stat-meter__head">
+            <span class="stat-meter__label" id="@_labelId">@Label</span>
+            <span class="stat-meter__value">@DisplayValue</span>
+        </div>
+    }
+
+    @* role="progressbar" rather than role="meter": meter has patchy assistive-tech support. *@
+    <div class="stat-meter__track"
+         role="progressbar"
+         aria-labelledby="@(ShowHead ? _labelId : null)"
+         aria-label="@(ShowHead ? null : Label)"
+         aria-valuemin="0"
+         aria-valuemax="@Max"
+         aria-valuenow="@Value"
+         aria-valuetext="@DisplayValue">
+        <span class="stat-meter__fill stat-meter__fill--@Variant" style="@($"--meter-value:{Percent}%")"></span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Caption))
+    {
+        <p class="stat-meter__caption">@Caption</p>
+    }
+</div>
+
+@code {
+    private string _labelId = string.Empty;
+
+    [Parameter, EditorRequired]
+    public required string Label { get; set; }
+
+    [Parameter]
+    public double Value { get; set; }
+
+    [Parameter]
+    public double Max { get; set; } = 100;
+
+    /// <summary>Overrides the default "value / max" readout, also used as <c>aria-valuetext</c>.</summary>
+    [Parameter]
+    public string? ValueText { get; set; }
+
+    /// <summary>brand | warm | success | danger.</summary>
+    [Parameter]
+    public string Variant { get; set; } = "brand";
+
+    [Parameter]
+    public string? Caption { get; set; }
+
+    /// <summary>When false the label moves to <c>aria-label</c> and only the bar renders.</summary>
+    [Parameter]
+    public bool ShowHead { get; set; } = true;
+
+    protected override void OnInitialized() => _labelId = $"meter-{Guid.NewGuid():N}";
+
+    // Max can legitimately be 0 (a franchise with no entries, an anime with no known episode count),
+    // so this must never divide by it.
+    private double Percent => Max <= 0
+        ? 0
+        : Math.Round(Math.Clamp(Value / Max * 100, 0, 100), 1);
+
+    private string DisplayValue => ValueText ?? $"{Value:0.#} / {Max:0.#}";
+}

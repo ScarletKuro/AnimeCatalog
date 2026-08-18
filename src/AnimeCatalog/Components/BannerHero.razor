@@ -1,0 +1,109 @@
+@* Banner artwork with the poster overlapping its lower edge. The grid rows are sized up front so a
+   late-arriving banner does not shift the layout, and text sits in row 2 where the scrim is opaque. *@
+<header class="banner-hero @(string.IsNullOrWhiteSpace(BannerUrl) ? "banner-hero--no-banner" : null)">
+    @if (!string.IsNullOrWhiteSpace(BannerUrl))
+    {
+        @* Decorative: the title is adjacent text, so announcing the artwork adds nothing. *@
+        <img class="banner-hero__banner" src="@BannerUrl" alt="" loading="lazy" />
+    }
+    <div class="banner-hero__scrim" aria-hidden="true"></div>
+
+    @* Sits over the artwork band. aria-label carries the grouping name that a heading would have. *@
+    @if (Toolbar is not null)
+    {
+        <div class="banner-hero__toolbar" role="group" aria-label="@ToolbarLabel">@Toolbar</div>
+    }
+
+    <div class="banner-hero__body">
+        <figure class="banner-hero__poster">
+            @if (!string.IsNullOrWhiteSpace(PosterUrl))
+            {
+                <img src="@PosterUrl" alt="@(PosterAlt ?? $"{Title} cover")" loading="lazy" />
+            }
+            else
+            {
+                <div class="poster-fallback" aria-hidden="true">@Initial</div>
+            }
+        </figure>
+
+        <div class="banner-hero__text">
+            @if (!string.IsNullOrWhiteSpace(Eyebrow))
+            {
+                <p class="eyebrow">@Eyebrow</p>
+            }
+
+            <h1 class="banner-hero__title">@Title</h1>
+
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p class="banner-hero__subtitle">@Subtitle</p>
+            }
+
+            @if (Badges is not null)
+            {
+                <div class="banner-hero__badges">@Badges</div>
+            }
+
+            @if (MetaContent is not null)
+            {
+                <div class="banner-hero__meta">@MetaContent</div>
+            }
+
+            @if (Actions is not null)
+            {
+                <div class="banner-hero__actions">@Actions</div>
+            }
+        </div>
+
+        @if (SideContent is not null)
+        {
+            <div class="banner-hero__aside">@SideContent</div>
+        }
+    </div>
+</header>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Title { get; set; }
+
+    [Parameter]
+    public string? BannerUrl { get; set; }
+
+    [Parameter]
+    public string? PosterUrl { get; set; }
+
+    [Parameter]
+    public string? PosterAlt { get; set; }
+
+    [Parameter]
+    public string? Eyebrow { get; set; }
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public RenderFragment? Badges { get; set; }
+
+    // Named MetaContent/SideContent rather than Meta/Aside: those collide with the HTML element
+    // names meta and aside, and Razor then parses the slots as markup instead of render fragments.
+    [Parameter]
+    public RenderFragment? MetaContent { get; set; }
+
+    /// <summary>Right-hand slot, used for the score split.</summary>
+    [Parameter]
+    public RenderFragment? SideContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    /// <summary>Controls pinned over the banner artwork, used for admin actions.</summary>
+    [Parameter]
+    public RenderFragment? Toolbar { get; set; }
+
+    [Parameter]
+    public string ToolbarLabel { get; set; } = "Actions";
+
+    private string Initial => string.IsNullOrWhiteSpace(Title)
+        ? "?"
+        : Title.Trim()[..1].ToUpperInvariant();
+}

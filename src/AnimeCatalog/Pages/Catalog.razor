@@ -1,0 +1,158 @@
+@page "/catalog"
+@inject CatalogService CatalogService
+
+<PageTitle>Catalog</PageTitle>
+
+<section class="stack">
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Catalog</p>
+            <h1>Franchise-aware watch history</h1>
+            <p class="lede">Search by title, filter by status, and expand each franchise without flattening sequels into a fake “season” model.</p>
+        </div>
+    </div>
+
+@if (!CatalogService.IsConfigured)
+    {
+        <ErrorState Title="Configuration required" Message="Configure Supabase before loading the catalog." />
+    }
+    else if (_accessState == CatalogAccessState.Private)
+    {
+        <PrivateCatalogState />
+    }
+    else if (!_hasLoaded)
+    {
+        @* Nothing above the fold until access is settled: rendering the filters first made a
+           private catalog flash a search bar before replacing it with the sign-in card. *@
+        <LoadingIndicator Text="Loading catalog..." />
+    }
+    else
+    {
+        <div class="filters-card">
+            <label class="field">
+                <span class="field-label">Search</span>
+                <input class="text-input" placeholder="Romaji or English title..." value="@_filters.Query" @oninput="OnQueryChangedAsync" />
+            </label>
+
+            <label class="field">
+                <span class="field-label">Status</span>
+                <select class="select-input" value="@_statusFilterText" @onchange="OnStatusChangedAsync">
+                    <option value="">All</option>
+                    <option value="watching">Watching</option>
+                    <option value="completed">Completed</option>
+                    <option value="planned">Planned</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="dropped">Dropped</option>
+                </select>
+            </label>
+
+            <label class="field">
+                <span class="field-label">Sort</span>
+                <select class="select-input" value="@_filters.Sort" @onchange="OnSortChangedAsync">
+                    <option value="@CatalogSortOption.Title">Title</option>
+                    <option value="@CatalogSortOption.ScoreDescending">Score descending</option>
+                    <option value="@CatalogSortOption.RecentlyAdded">Recently added</option>
+                    <option value="@CatalogSortOption.RecentlyCompleted">Recently completed</option>
+                    <option value="@CatalogSortOption.Year">Year</option>
+                </select>
+            </label>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingIndicator Text="Loading catalog..." />
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <ErrorState Title="Catalog failed" Message="@_error" Retry="LoadAsync" />
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="empty-card">
+                <h3>No entries match the current filters.</h3>
+                <p>Try clearing the search query or switching the status filter.</p>
+            </div>
+        }
+        else
+        {
+            <div class="franchise-grid">
+                @foreach (var item in _items)
+                {
+                    <FranchiseCard Summary="item" />
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private readonly CatalogFilters _filters = new();
+    private CatalogAccessState _accessState = CatalogAccessState.Available;
+    private string _statusFilterText = string.Empty;
+    private bool _isLoading = true;
+    private bool _hasLoaded;
+    private string? _error;
+    private IReadOnlyList<FranchiseSummaryViewModel> _items = [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (!CatalogService.IsConfigured)
+        {
+            _accessState = CatalogAccessState.NotConfigured;
+            _isLoading = false;
+            _hasLoaded = true;
+            _items = [];
+            _error = null;
+            return;
+        }
+
+        try
+        {
+            _isLoading = true;
+            _accessState = CatalogAccessState.Available;
+            _error = null;
+            _items = await CatalogService.GetCatalogAsync(_filters);
+        }
+        catch (Exception ex) when (CatalogAccess.IsPrivateAccessDenied(ex))
+        {
+            _accessState = CatalogAccessState.Private;
+            _items = [];
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _accessState = CatalogAccessState.Error;
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+            _hasLoaded = true;
+        }
+    }
+
+    private async Task OnQueryChangedAsync(ChangeEventArgs args)
+    {
+        _filters.Query = args.Value?.ToString() ?? string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task OnStatusChangedAsync(ChangeEventArgs args)
+    {
+        _statusFilterText = args.Value?.ToString() ?? string.Empty;
+        _filters.Status = string.IsNullOrWhiteSpace(_statusFilterText)
+            ? null
+            : CatalogStatusExtensions.Parse(_statusFilterText);
+        await LoadAsync();
+    }
+
+    private async Task OnSortChangedAsync(ChangeEventArgs args)
+    {
+        _filters.Sort = Enum.TryParse<CatalogSortOption>(args.Value?.ToString(), out var sort)
+            ? sort
+            : CatalogSortOption.Title;
+        await LoadAsync();
+    }
+}

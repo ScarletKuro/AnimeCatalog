@@ -1,0 +1,283 @@
+@page "/admin/add"
+@inject AdminCatalogService AdminCatalogService
+@inject BrowserStorageService BrowserStorageService
+@inject CatalogService CatalogService
+@inject NavigationManager NavigationManager
+@inject AuthService AuthService
+
+<PageTitle>Add anime</PageTitle>
+
+<section class="stack">
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Add anime from AniList</h1>
+            <p class="lede">Search AniList, preview cached metadata, decide franchise grouping, then save a local catalog entry.</p>
+        </div>
+    </div>
+
+    @if (!AuthService.IsAdmin)
+    {
+        <ErrorState Title="Admin access required" Message="Only users present in app_admins can add anime." />
+    }
+    else
+    {
+        @* The only trace of a save that deliberately did not navigate: without it, "Save and add
+           another" would look indistinguishable from the form silently resetting itself. *@
+        @if (_lastSaved is not null)
+        {
+            <p class="admin-add-feedback" role="status">
+                <span>Saved <strong>@_lastSaved.Title</strong>. Search the next title below.</span>
+                <NavLink href="@($"anime/{_lastSaved.Id}")" class="button button--inline">Open entry</NavLink>
+            </p>
+        }
+
+        <div class="admin-add-workspace">
+            <section class="panel admin-add-workspace__search" @ref="_searchSection">
+                <div class="panel__header">
+                    <div>
+                        <h2>Find AniList entry</h2>
+                        <p class="lede">Type a title, pause for results, then pick the exact season or movie you want to import.</p>
+                    </div>
+                </div>
+
+                <AnimeSearch OnSelected="SelectSearchResultAsync" CatalogedAniListIds="_catalogedAniListIds" />
+            </section>
+
+            <section class="admin-add-workspace__editor" data-scroll-target @ref="_editorSection">
+                @* One state at a time: an error must never render beside a draft, or a rejected
+                   selection leaves the previous anime's form on screen looking like the current one. *@
+                @if (_isLoadingDraft)
+                {
+                    <LoadingIndicator Text="Loading AniList metadata..." />
+                }
+                else if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <ErrorState Title="Add anime failed" Message="@_error" />
+                }
+                else if (_inspection is { IsAlreadyInCatalog: true })
+                {
+                    <section class="panel panel--notice">
+                        <div class="panel__header"><h2>Already in your catalog</h2></div>
+                        <p class="lede">
+                            <strong>@_inspection.Title</strong> is entry @_inspection.ExistingEntry!.Id@(_inspection.ExistingFranchise is null ? "" : $", grouped under {_inspection.ExistingFranchise.Title}").
+                        </p>
+                        <div class="button-row">
+                            <NavLink href="@($"anime/{_inspection.ExistingEntry.Id}")" class="button button--ghost">Open entry</NavLink>
+                            <NavLink href="@($"admin/edit/{_inspection.ExistingEntry.Id}")" class="button button--primary">Edit entry</NavLink>
+                        </div>
+                    </section>
+
+                    <section class="panel">
+                        <div class="panel__header"><h2>Related anime</h2></div>
+                        @if (_inspection.Relations.Count == 0)
+                        {
+                            <p class="empty-note">AniList lists no related anime for this entry.</p>
+                        }
+                        else
+                        {
+                            <p class="lede">Pick one that is not added yet to start a draft for it.</p>
+                            <ul class="relation-list">
+                                @foreach (var relation in _inspection.Relations)
+                                {
+                                    <li class="franchise-entry-list__item">
+                                        <div>
+                                            <span class="franchise-entry-list__title">@relation.Title</span>
+                                            <div class="franchise-entry-list__subline">
+                                                <span class="chip chip--muted">@relation.DisplayLabel</span>
+                                                @if (MediaDisplayFormatter.FormatAndYear(relation.Format, relation.SeasonYear) is { } meta)
+                                                {
+                                                    <span class="chip">@meta</span>
+                                                }
+                                            </div>
+                                        </div>
+                                        @if (relation.IsInCatalog)
+                                        {
+                                            <NavLink href="@($"anime/{relation.LocalAnimeEntryId}")" class="button button--inline">Already added</NavLink>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="button button--primary"
+                                                    @onclick="() => LoadSuggestionAsync(relation)">Add this</button>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </section>
+                }
+                else if (_model is not null)
+                {
+                    <AnimeEditorForm
+                        Model="_model"
+                        Franchises="_franchises"
+                        IsSaving="_isSaving"
+                        SubmitLabel="Save anime"
+                        SavingLabel="Saving..."
+                        OnValidSubmit="SaveAsync"
+                        OnInvalidSubmit="ClearAddAnotherIntent"
+                        OnSuggestionSelected="LoadSuggestionAsync">
+                        <FooterActions>
+                            @* A submit button, not a plain one: it has to run the same validation as
+                               "Save anime", so the only difference is the intent it records first. *@
+                            <button type="submit" class="button button--ghost" disabled="@_isSaving"
+                                    @onclick="() => _addAnotherPending = true">Save and add another</button>
+                        </FooterActions>
+                    </AnimeEditorForm>
+                }
+                else
+                {
+                    <section class="panel admin-add-workspace__placeholder">
+                        <p class="eyebrow">Draft</p>
+                        <h2>Select an AniList entry</h2>
+                        <p class="lede">The editor appears here after you choose a result, so you do not need to hunt for the form below a long season list.</p>
+                    </section>
+                }
+            </section>
+        </div>
+    }
+</section>
+
+@code {
+    private AnimeEditorModel? _model;
+    private AniListInspectionViewModel? _inspection;
+    private IReadOnlyList<Franchise> _franchises = [];
+    private Dictionary<int, long> _catalogedAniListIds = [];
+    private SavedEntry? _lastSaved;
+    private ElementReference _editorSection;
+    private ElementReference _searchSection;
+    private bool _isLoadingDraft;
+    private bool _isSaving;
+    private bool _addAnotherPending;
+    private bool _scrollEditorIntoViewPending;
+    private bool _scrollSearchIntoViewPending;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthService.IsAdmin)
+        {
+            _franchises = await CatalogService.GetFranchisesAsync();
+            _catalogedAniListIds = new Dictionary<int, long>(await AdminCatalogService.GetCatalogedAniListIdsAsync());
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Only ever one of the two: a draft load scrolls to the editor, a completed save scrolls
+        // back to the search panel that is about to be used again.
+        if (_scrollEditorIntoViewPending)
+        {
+            _scrollEditorIntoViewPending = false;
+            await BrowserStorageService.ScrollElementIntoViewAsync(_editorSection);
+        }
+        else if (_scrollSearchIntoViewPending)
+        {
+            _scrollSearchIntoViewPending = false;
+            await BrowserStorageService.ScrollElementIntoViewAsync(_searchSection);
+        }
+    }
+
+    private Task SelectSearchResultAsync(AnimeCatalog.Models.AniList.AniListMedia media) => LoadAniListIdAsync(media.Id);
+
+    private Task LoadSuggestionAsync(RelatedAnimeSuggestion suggestion) => LoadAniListIdAsync(
+        suggestion.AniListId,
+        // A sequel belongs in the same franchise as the entry it was suggested from.
+        inheritFranchiseId: _inspection?.ExistingFranchise?.Id ?? _inspection?.ExistingEntry?.FranchiseId);
+
+    private async Task LoadAniListIdAsync(int aniListId, long? inheritFranchiseId = null)
+    {
+        // Every previous outcome is dropped up front, so a failure can never leave the last anime's
+        // draft on screen under a new selection's error.
+        _model = null;
+        _inspection = null;
+        _error = null;
+        _lastSaved = null;
+
+        try
+        {
+            _isLoadingDraft = true;
+
+            var inspection = await AdminCatalogService.InspectAniListIdAsync(aniListId);
+            _inspection = inspection;
+            _model = inspection.Draft;
+
+            if (_model is not null && inheritFranchiseId is not null)
+            {
+                _model.FranchiseId = inheritFranchiseId;
+                _model.FranchiseAssignmentMode = FranchiseAssignmentMode.Existing;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoadingDraft = false;
+            _scrollEditorIntoViewPending = true;
+        }
+    }
+
+    /// <summary>
+    /// Validation rejected the submit, so the clicked button never reached <see cref="SaveAsync"/>.
+    /// Dropping the intent here stops it being inherited by whichever button is clicked next.
+    /// </summary>
+    private void ClearAddAnotherIntent() => _addAnotherPending = false;
+
+    private async Task SaveAsync()
+    {
+        if (_model is null)
+        {
+            return;
+        }
+
+        // Read and cleared together: whatever happens below, the next submit starts from no intent.
+        var addAnother = _addAnotherPending;
+        _addAnotherPending = false;
+
+        // Captured before the save, because the add-another path clears the model on success.
+        var aniListId = _model.AniListId;
+        var savedTitle = string.IsNullOrWhiteSpace(_model.TitleEnglish) ? _model.TitleRomaji : _model.TitleEnglish;
+
+        try
+        {
+            _isSaving = true;
+            _error = null;
+            var id = await AdminCatalogService.SaveAsync(_model);
+
+            if (!addAnother)
+            {
+                NavigationManager.NavigateTo($"anime/{id}");
+                return;
+            }
+
+            _lastSaved = new SavedEntry(id, savedTitle);
+
+            // The same reset LoadAniListIdAsync performs, minus the feedback line: the editor pane
+            // falls back to its placeholder and the search panel is ready for the next title.
+            _model = null;
+            _inspection = null;
+
+            // Recorded locally rather than refetched: the entry just created has to show as already
+            // added if it comes back in a later search.
+            _catalogedAniListIds[aniListId] = id;
+
+            // SaveAsync can create a franchise, and the list is otherwise only read once on init, so
+            // without this the franchise created here is missing from the next draft's picker.
+            _franchises = await CatalogService.GetFranchisesAsync();
+
+            _scrollSearchIntoViewPending = true;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private sealed record SavedEntry(long Id, string Title);
+}

@@ -1,0 +1,94 @@
+@page "/admin"
+@inject AuthService AuthService
+@inject CatalogService CatalogService
+
+<PageTitle>Admin</PageTitle>
+
+<section class="stack">
+    @* The header and its h1 stay outside every state branch: Routes.razor focuses the h1 after
+       navigation, so it has to exist while loading and while access is refused. The action link
+       does not - anonymous visitors must not see a route they cannot open. *@
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Catalog maintenance</h1>
+            <p class="lede">Search AniList, add new entries, adjust franchise grouping, and keep cached metadata current.</p>
+        </div>
+        @if (AuthService.IsAdmin)
+        {
+            <NavLink href="admin/add" class="button button--primary">Add anime</NavLink>
+        }
+    </div>
+
+    @if (!AuthService.IsAuthenticated)
+    {
+        <ErrorState Title="Authentication required" Message="Sign in with GitHub before opening the admin dashboard." />
+    }
+    else if (!AuthService.IsAdmin)
+    {
+        <ErrorState Title="Admin access required" Message="Your user is authenticated but is not present in app_admins." />
+    }
+    else if (_isLoading)
+    {
+        <LoadingIndicator Text="Loading admin dashboard..." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Admin dashboard failed" Message="@_error" Retry="LoadAsync" />
+    }
+    else if (_summary is not null)
+    {
+        <div class="stats-grid">
+            <div class="stat-card"><span>Franchises</span><strong>@_summary.FranchiseCount</strong></div>
+            <div class="stat-card"><span>Anime entries</span><strong>@_summary.AnimeEntryCount</strong></div>
+            <div class="stat-card"><span>Cached relations</span><strong>@_summary.RelationsCount</strong></div>
+            <div class="stat-card"><span>Completed</span><strong>@_summary.CompletedCount</strong></div>
+            <div class="stat-card"><span>Watching</span><strong>@_summary.WatchingCount</strong></div>
+        </div>
+
+        <CatalogVisibilityPanel Enabled="_summary.PublicCatalogEnabled"
+                                EnabledChanged="OnPublicCatalogEnabledChanged" />
+
+        <CatalogTransferPanel OnImported="LoadAsync" />
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private string? _error;
+    private AdminDashboardViewModel? _summary;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (!AuthService.IsAdmin)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            _isLoading = true;
+            _error = null;
+            _summary = await CatalogService.GetAdminDashboardAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnPublicCatalogEnabledChanged(bool enabled)
+    {
+        if (_summary is not null)
+        {
+            _summary.PublicCatalogEnabled = enabled;
+        }
+    }
+}

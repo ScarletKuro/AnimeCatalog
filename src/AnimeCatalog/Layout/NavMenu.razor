@@ -1,0 +1,234 @@
+@inject AuthService AuthService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+@implements IAsyncDisposable
+
+<header class="site-header">
+    <div class="site-header__inner">
+        <NavLink href="" Match="NavLinkMatch.All" class="site-brand">
+            <span class="site-brand__mark" aria-hidden="true"></span>
+            <span class="site-brand__title">Anime Catalog</span>
+        </NavLink>
+
+        <nav class="site-nav">
+            <NavLink href="" Match="NavLinkMatch.All" class="site-nav__link">Home</NavLink>
+            <NavLink href="catalog" class="site-nav__link">Catalog</NavLink>
+            @if (AuthService.IsAdmin)
+            {
+                <NavLink href="watch-next" class="site-nav__link">Watch next</NavLink>
+                @* Prefix matching would light this up on /admin/add too, so both admin links
+                   would read as active at once. *@
+                <NavLink href="admin" Match="NavLinkMatch.All" class="site-nav__link">Admin</NavLink>
+                <NavLink href="admin/add" class="site-nav__link site-nav__link--action">+ Add</NavLink>
+            }
+        </nav>
+
+        <div class="site-actions">
+            @if (!AuthService.IsConfigured)
+            {
+                <span class="site-chip site-chip--muted">Supabase not configured</span>
+            }
+            else if (AuthService.IsAuthenticated)
+            {
+                <div class="@ProfileMenuClass" @ref="_profileMenuElement">
+                    <button
+                        type="button"
+                        class="profile-menu__trigger"
+                        aria-expanded="@_isProfileMenuOpen"
+                        aria-haspopup="menu"
+                        @onclick="ToggleProfileMenuAsync">
+                        <span class="profile-menu__avatar" aria-hidden="true">
+                            @if (HasAvatar)
+                            {
+                                <img class="profile-menu__avatar-image" src="@AvatarUrl" alt="" />
+                            }
+                            else
+                            {
+                                @UserInitials
+                            }
+                        </span>
+                        <span class="profile-menu__identity">
+                            <span class="profile-menu__name">@DisplayName</span>
+                            <span class="profile-menu__role">@(AuthService.IsAdmin ? "Admin access" : "Signed in")</span>
+                        </span>
+                        <span class="profile-menu__chevron" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" focusable="false">
+                                <path d="M5.25 7.5 10 12.25 14.75 7.5" />
+                            </svg>
+                        </span>
+                    </button>
+
+                    @if (_isProfileMenuOpen)
+                    {
+                        <div class="profile-menu__panel" role="menu">
+                            <div class="profile-menu__panel-head">
+                                <span class="profile-menu__avatar profile-menu__avatar--large" aria-hidden="true">
+                                    @if (HasAvatar)
+                                    {
+                                        <img class="profile-menu__avatar-image" src="@AvatarUrl" alt="" />
+                                    }
+                                    else
+                                    {
+                                        @UserInitials
+                                    }
+                                </span>
+                                <div class="profile-menu__meta">
+                                    <strong>@DisplayName</strong>
+                                    <span>@(AuthService.IsAdmin ? "Project admin" : "Authenticated user")</span>
+                                </div>
+                            </div>
+
+                            @if (AuthService.IsAdmin)
+                            {
+                                <NavLink href="admin" class="profile-menu__link">
+                                    <span class="profile-menu__link-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 20 20" focusable="false">
+                                            <path d="M10 2.5 16 5.5v4.5c0 3.75-2.6 6.8-6 7.5-3.4-.7-6-3.75-6-7.5V5.5l6-3Z" />
+                                        </svg>
+                                    </span>
+                                    <span>Open admin</span>
+                                </NavLink>
+                            }
+
+                            <button type="button" class="profile-menu__link profile-menu__link--danger" @onclick="LogoutAsync">
+                                <span class="profile-menu__link-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 20 20" focusable="false">
+                                        <path d="M8 3.5h-2A2.5 2.5 0 0 0 3.5 6v8A2.5 2.5 0 0 0 6 16.5h2" />
+                                        <path d="M11 6.5 14.5 10 11 13.5" />
+                                        <path d="M6.5 10h8" />
+                                    </svg>
+                                </span>
+                                <span>Sign out</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <NavLink href="login" class="button button--primary">Owner sign in</NavLink>
+            }
+        </div>
+    </div>
+</header>
+
+@code {
+    private ElementReference _profileMenuElement;
+    private IJSObjectReference? _browserModule;
+    private int _outsideClickRegistrationId;
+    private bool _isProfileMenuOpen;
+    private bool _outsideClickSyncPending;
+
+    protected override void OnInitialized()
+    {
+        AuthService.StateChanged += HandleStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_outsideClickSyncPending)
+        {
+            return;
+        }
+
+        _outsideClickSyncPending = false;
+        await SyncOutsideClickHandlerAsync();
+    }
+
+    private async Task ToggleProfileMenuAsync()
+    {
+        _isProfileMenuOpen = !_isProfileMenuOpen;
+        _outsideClickSyncPending = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LogoutAsync()
+    {
+        _isProfileMenuOpen = false;
+        _outsideClickSyncPending = true;
+        await AuthService.LogoutAsync();
+    }
+
+    private string DisplayName =>
+        AuthService.CurrentSession?.User.DisplayName?.Trim() is { Length: > 0 } displayName
+            ? displayName
+            : "Owner";
+
+    private string ProfileMenuClass => _isProfileMenuOpen ? "profile-menu profile-menu--open" : "profile-menu";
+
+    private string? AvatarUrl => AuthService.CurrentSession?.User.AvatarUrl;
+
+    private bool HasAvatar => !string.IsNullOrWhiteSpace(AvatarUrl);
+
+    private string UserInitials
+    {
+        get
+        {
+            var parts = DisplayName
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Take(2)
+                .Select(static part => char.ToUpperInvariant(part[0]))
+                .ToArray();
+
+            return parts.Length > 0 ? new string(parts) : "AC";
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleOutsideProfileClickAsync()
+    {
+        if (!_isProfileMenuOpen)
+        {
+            return;
+        }
+
+        _isProfileMenuOpen = false;
+        _outsideClickSyncPending = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SyncOutsideClickHandlerAsync()
+    {
+        _browserModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/auth.js");
+
+        if (_outsideClickRegistrationId != 0)
+        {
+            await _browserModule.InvokeVoidAsync("unregisterOutsideClick", _outsideClickRegistrationId);
+            _outsideClickRegistrationId = 0;
+        }
+
+        if (_isProfileMenuOpen)
+        {
+            _outsideClickRegistrationId = await _browserModule.InvokeAsync<int>(
+                "registerOutsideClick",
+                _profileMenuElement,
+                DotNetObjectReference.Create(this),
+                nameof(HandleOutsideProfileClickAsync));
+        }
+    }
+
+    private void HandleStateChanged()
+    {
+        _isProfileMenuOpen = false;
+        _outsideClickSyncPending = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.StateChanged -= HandleStateChanged;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_browserModule is not null)
+        {
+            if (_outsideClickRegistrationId != 0)
+            {
+                await _browserModule.InvokeVoidAsync("unregisterOutsideClick", _outsideClickRegistrationId);
+            }
+
+            await _browserModule.DisposeAsync();
+        }
+    }
+}

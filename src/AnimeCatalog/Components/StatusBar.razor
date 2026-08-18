@@ -1,0 +1,47 @@
+@* Proportional status breakdown with a matching legend. Extracted from the franchise page so the
+   home page states the whole catalog the same way one franchise is stated. Empty statuses are
+   skipped in both the bar and the legend: a zero-width segment is invisible but still announced. *@
+<div class="status-bar-block">
+    @* role="img" plus the joined counts: the segments are decorative on their own, and the legend
+       below repeats them as text for anyone who cannot see the proportions. *@
+    <div class="status-bar" role="img" aria-label="@BreakdownLabel">
+        @foreach (var segment in NonEmptyStatuses)
+        {
+            <span class="status-bar__segment status-bar__segment--@segment.ApiValue"
+                  style="@($"--seg:{Percent(segment)}%")"></span>
+        }
+    </div>
+    <ul class="status-bar__legend">
+        @foreach (var segment in NonEmptyStatuses)
+        {
+            <li class="status-bar__key">
+                <span class="status-bar__dot status-bar__dot--@segment.ApiValue" aria-hidden="true"></span>
+                @segment.Label · @segment.Count
+            </li>
+        }
+    </ul>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<StatusCount> Breakdown { get; set; }
+
+    /// <summary>
+    /// Denominator for the segment widths. Defaults to the sum of the breakdown, which is what a
+    /// caller wants unless it is showing a subset of a larger total.
+    /// </summary>
+    [Parameter]
+    public int? Total { get; set; }
+
+    private IEnumerable<StatusCount> NonEmptyStatuses => Breakdown.Where(segment => segment.Count > 0);
+
+    private int EffectiveTotal => Total ?? Breakdown.Sum(segment => segment.Count);
+
+    // Must never divide by zero: an empty catalog and an empty franchise both reach here.
+    private int Percent(StatusCount segment) => EffectiveTotal <= 0
+        ? 0
+        : (int)Math.Round(segment.Count / (double)EffectiveTotal * 100);
+
+    private string BreakdownLabel =>
+        string.Join(", ", NonEmptyStatuses.Select(segment => $"{segment.Count} {segment.Label.ToLowerInvariant()}"));
+}

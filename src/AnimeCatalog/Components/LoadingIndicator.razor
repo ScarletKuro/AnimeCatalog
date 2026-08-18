@@ -1,0 +1,14 @@
+<div class="loading-card" role="status" aria-live="polite">
+    <div class="loading-card__rail" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+    <p class="loading-card__title">Loading</p>
+    <p class="loading-card__text">@Text</p>
+</div>
+
+@code {
+    [Parameter]
+    public string Text { get; set; } = "Loading...";
+}

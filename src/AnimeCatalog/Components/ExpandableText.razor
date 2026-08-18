@@ -1,0 +1,61 @@
+@* Collapsed state renders plain text only, so the sanitized markup is used solely once expanded. *@
+<div class="expandable-text">
+    <div id="@_bodyId"
+         class="expandable-text__body @(NeedsToggle && !_expanded ? "expandable-text__body--collapsed" : null)"
+         style="@($"--clamp-lines:{CollapsedLines}")">
+        @if (Html is { Length: > 0 })
+        {
+            @((MarkupString)Html)
+        }
+        else
+        {
+            <p>@Text</p>
+        }
+    </div>
+
+    @if (NeedsToggle)
+    {
+        <DisclosureButton Expanded="_expanded"
+                          CollapsedLabel="@ExpandLabel"
+                          ExpandedLabel="@CollapseLabel"
+                          ControlsId="@_bodyId"
+                          OnToggle="Toggle" />
+    }
+</div>
+
+@code {
+    private bool _expanded;
+    private string _bodyId = string.Empty;
+
+    /// <summary>
+    /// Pre-sanitized markup. Must come from <c>AniListDescriptionSanitizer</c> — this is rendered as
+    /// a <c>MarkupString</c>, so raw AniList HTML here would be an XSS hole.
+    /// </summary>
+    [Parameter]
+    public string? Html { get; set; }
+
+    /// <summary>Plain-text alternative, used when <see cref="Html"/> is empty.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    [Parameter]
+    public int CollapsedLines { get; set; } = 7;
+
+    /// <summary>Length below which no toggle is offered.</summary>
+    [Parameter]
+    public int ToggleThreshold { get; set; } = 420;
+
+    [Parameter]
+    public string ExpandLabel { get; set; } = "Read more";
+
+    [Parameter]
+    public string CollapseLabel { get; set; } = "Show less";
+
+    protected override void OnInitialized() => _bodyId = $"expandable-{Guid.NewGuid():N}";
+
+    private int ContentLength => Html is { Length: > 0 } ? Html.Length : Text?.Length ?? 0;
+
+    private bool NeedsToggle => ContentLength > ToggleThreshold;
+
+    private void Toggle() => _expanded = !_expanded;
+}

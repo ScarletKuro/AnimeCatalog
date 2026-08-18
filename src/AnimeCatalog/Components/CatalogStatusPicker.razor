@@ -1,0 +1,34 @@
+<div class="status-picker" role="radiogroup" aria-label="Catalog status">
+    @foreach (var status in Enum.GetValues<CatalogStatus>())
+    {
+        var isSelected = Value == status;
+
+        <button
+            type="button"
+            class="@(isSelected ? $"status-picker__option status-picker__option--selected status-picker__option--{status.ToApiValue()}" : $"status-picker__option status-picker__option--{status.ToApiValue()}")"
+            role="radio"
+            aria-checked="@isSelected"
+            @onclick="() => SelectAsync(status)">
+            @status.ToDisplayLabel()
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public CatalogStatus Value { get; set; }
+
+    [Parameter]
+    public EventCallback<CatalogStatus> ValueChanged { get; set; }
+
+    private async Task SelectAsync(CatalogStatus status)
+    {
+        if (Value == status)
+        {
+            return;
+        }
+
+        Value = status;
+        await ValueChanged.InvokeAsync(status);
+    }
+}

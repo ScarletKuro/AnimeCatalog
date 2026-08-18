@@ -1,0 +1,107 @@
+@inject AdminCatalogService AdminCatalogService
+
+<div class="search-panel">
+    <label class="field-label" for="@_inputId">Search AniList</label>
+    <input id="@_inputId" class="text-input" placeholder="Search by title..." value="@_query" @onchange="HandleChangeAsync" />
+
+    @if (_isLoading)
+    {
+        <LoadingIndicator Text="Searching AniList..." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="AniList search failed" Message="@_error" />
+    }
+    else if (_results.Count > 0)
+    {
+        <div class="search-results">
+            @foreach (var result in _results)
+            {
+                <AnimeSearchResult Media="result"
+                                   IsSelected="@(result.Id == _selectedMediaId)"
+                                   ExistingAnimeEntryId="@GetExistingAnimeEntryId(result.Id)"
+                                   OnSelected="HandleSelectedAsync" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private const int MinimumQueryLength = 2;
+    private readonly string _inputId = $"anilist-search-{Guid.NewGuid():N}";
+    private string _query = string.Empty;
+    private int? _selectedMediaId;
+    private bool _isLoading;
+    private string? _error;
+    private List<AnimeCatalog.Models.AniList.AniListMedia> _results = [];
+
+    [Parameter]
+    public EventCallback<AnimeCatalog.Models.AniList.AniListMedia> OnSelected { get; set; }
+
+    /// <summary>
+    /// Cataloged AniList id to local anime entry id. Supplied by the host page rather than fetched
+    /// here, so this component keeps its single service dependency.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyDictionary<int, long> CatalogedAniListIds { get; set; } =
+        new Dictionary<int, long>();
+
+    private long? GetExistingAnimeEntryId(int aniListId) =>
+        CatalogedAniListIds.TryGetValue(aniListId, out var animeEntryId) ? animeEntryId : null;
+
+    private async Task HandleChangeAsync(ChangeEventArgs args)
+    {
+        var nextQuery = args.Value?.ToString() ?? string.Empty;
+        if (_query == nextQuery)
+        {
+            return;
+        }
+
+        _query = nextQuery;
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        var trimmedQuery = _query.Trim();
+
+        if (string.IsNullOrWhiteSpace(trimmedQuery) || trimmedQuery.Length < MinimumQueryLength)
+        {
+            _results = [];
+            _selectedMediaId = null;
+            _error = null;
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        try
+        {
+            _error = null;
+            _isLoading = true;
+            await InvokeAsync(StateHasChanged);
+            var results = await AdminCatalogService.SearchAniListAsync(trimmedQuery);
+            _results = results.ToList();
+            if (_selectedMediaId is not null && _results.All(item => item.Id != _selectedMediaId.Value))
+            {
+                _selectedMediaId = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _results = [];
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleSelectedAsync(AnimeCatalog.Models.AniList.AniListMedia media)
+    {
+        _selectedMediaId = media.Id;
+        await OnSelected.InvokeAsync(media);
+    }
+}

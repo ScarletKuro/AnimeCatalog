@@ -1,0 +1,61 @@
+@inject BrowserStorageService BrowserStorage
+
+@if (IsOpen)
+{
+    @* A native <dialog> opened with showModal(): it lives in the browser's top layer, so no
+       sibling card can paint over it, and Esc plus the focus trap come for free. *@
+    <dialog class="confirm-dialog" @ref="_dialog" @oncancel="OnCancel">
+        <h3>@Title</h3>
+        <p>@Message</p>
+        <div class="confirm-dialog__actions">
+            <button type="button" class="button button--ghost" @onclick="OnCancel">Cancel</button>
+            <button type="button" class="button button--danger" @onclick="OnConfirm">@ConfirmLabel</button>
+        </div>
+    </dialog>
+}
+
+@code {
+    private ElementReference _dialog;
+    private bool _wasOpen;
+    private bool _showPending;
+
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "Confirm action";
+
+    [Parameter]
+    public string Message { get; set; } = "This action cannot be undone.";
+
+    [Parameter]
+    public string ConfirmLabel { get; set; } = "Confirm";
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen != _wasOpen)
+        {
+            _wasOpen = IsOpen;
+            _showPending = IsOpen;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_showPending)
+        {
+            return;
+        }
+
+        // Only ever opened here: closing is Blazor removing the element, which drops it out of
+        // the top layer on its own.
+        _showPending = false;
+        await BrowserStorage.ShowModalDialogAsync(_dialog);
+    }
+}

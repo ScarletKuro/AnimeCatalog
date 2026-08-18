@@ -1,0 +1,8 @@
+<span class="@CssClass">@Status.ToDisplayLabel()</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public CatalogStatus Status { get; set; }
+
+    private string CssClass => $"status-badge status-badge--{Status.ToApiValue()}";
+}

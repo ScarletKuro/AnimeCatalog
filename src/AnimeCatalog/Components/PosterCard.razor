@@ -1,0 +1,116 @@
+@* 2:3 poster tile sharing FranchiseCard's poster treatment (scrim, hover zoom, stretched link).
+   Also serves as the relation card: a badge carries the relation type and IsExternal links out. *@
+<article class="poster-card @(IsExternal ? "poster-card--external" : null) @(IsDimmed ? "poster-card--dimmed" : null)">
+    <div class="poster-card__figure">
+        @if (!string.IsNullOrWhiteSpace(CoverUrl))
+        {
+            <img src="@CoverUrl" alt="@($"{Title} cover")" loading="lazy" />
+        }
+        else
+        {
+            <div class="poster-fallback" aria-hidden="true">@Initial</div>
+        }
+
+        @* One row rather than two pinned corners, so a long relation label and a score chip share the
+           space instead of the badge having to reserve a gutter it cannot measure. *@
+        @if (!string.IsNullOrWhiteSpace(BadgeText) || Score is not null)
+        {
+            <div class="poster-card__top">
+                @if (!string.IsNullOrWhiteSpace(BadgeText))
+                {
+                    <span class="poster-card__badge poster-card__badge--@BadgeVariant">@BadgeText</span>
+                }
+
+                @if (Score is not null)
+                {
+                    <span class="poster-card__score"><RatingDisplay Score="Score" /></span>
+                }
+            </div>
+        }
+
+        <div class="poster-card__overlay">
+            <h3 class="poster-card__title">@Title</h3>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p class="poster-card__meta">@Subtitle</p>
+            }
+        </div>
+
+        @* Progress is decorative here: the footer states it as text via ProgressDisplay. *@
+        @if (ProgressPercent is not null)
+        {
+            <div class="poster-card__progress" aria-hidden="true">
+                <span style="@($"--progress:{Math.Clamp(ProgressPercent.Value, 0, 100)}%")"></span>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Href))
+        {
+            @if (IsExternal)
+            {
+                <a class="poster-card__link"
+                   href="@Href"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="@($"Open {Title} on AniList (opens in a new tab)")"></a>
+            }
+            else
+            {
+                <NavLink class="poster-card__link" href="@Href" aria-label="@($"Open {Title}")"></NavLink>
+            }
+        }
+    </div>
+
+    @if (Footer is not null)
+    {
+        <div class="poster-card__footer">@Footer</div>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Title { get; set; }
+
+    [Parameter]
+    public string? CoverUrl { get; set; }
+
+    /// <summary>One-line meta such as "TV · 2023".</summary>
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>Opens <see cref="Href"/> in a new tab instead of routing internally.</summary>
+    [Parameter]
+    public bool IsExternal { get; set; }
+
+    /// <summary>
+    /// Plays the card down without hiding it: still readable, still clickable, but it stops competing
+    /// for attention with the entries that matter.
+    /// </summary>
+    [Parameter]
+    public bool IsDimmed { get; set; }
+
+    /// <summary>Top-left pill: a relation type, or "Watching".</summary>
+    [Parameter]
+    public string? BadgeText { get; set; }
+
+    /// <summary>neutral | live | warm | danger.</summary>
+    [Parameter]
+    public string BadgeVariant { get; set; } = "neutral";
+
+    /// <summary>Your score, shown as a chip in the top-right corner.</summary>
+    [Parameter]
+    public decimal? Score { get; set; }
+
+    [Parameter]
+    public int? ProgressPercent { get; set; }
+
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
+    private string Initial => string.IsNullOrWhiteSpace(Title)
+        ? "?"
+        : Title.Trim()[..1].ToUpperInvariant();
+}

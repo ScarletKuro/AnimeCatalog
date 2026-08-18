@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Anime Catalog</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="alternate icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <script type="importmap"></script>
+    <script>
+        (function () {
+            const redirect = sessionStorage.getItem('spa-redirect');
+            if (!redirect) return;
+            sessionStorage.removeItem('spa-redirect');
+            history.replaceState(null, '', redirect);
+        })();
+    </script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="boot-loading-shell">
+            <div class="boot-loading" role="status" aria-live="polite">
+                <div class="boot-loading__scene" aria-hidden="true">
+                    <div class="boot-loading__glow"></div>
+                    <div class="boot-loading__mascot">
+                        <div class="boot-loading__shadow"></div>
+                        <div class="boot-loading__body">
+                            <div class="boot-loading__orb"></div>
+                            <div class="boot-loading__tail"></div>
+                            <div class="boot-loading__head">
+                                <div class="boot-loading__ear boot-loading__ear--left"></div>
+                                <div class="boot-loading__ear boot-loading__ear--right"></div>
+                                <div class="boot-loading__face">
+                                    <span class="boot-loading__eye boot-loading__eye--left"></span>
+                                    <span class="boot-loading__eye boot-loading__eye--right"></span>
+                                    <span class="boot-loading__blush boot-loading__blush--left"></span>
+                                    <span class="boot-loading__blush boot-loading__blush--right"></span>
+                                    <span class="boot-loading__mouth"></span>
+                                </div>
+                            </div>
+                            <div class="boot-loading__spark boot-loading__spark--one"></div>
+                            <div class="boot-loading__spark boot-loading__spark--two"></div>
+                            <div class="boot-loading__spark boot-loading__spark--three"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="boot-loading__meta">
+                    <p class="boot-loading__eyebrow">Boot sequence</p>
+                    <p class="boot-loading__text">Booting Anime Catalog...</p>
+                    <div class="boot-loading__dots" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

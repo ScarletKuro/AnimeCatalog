@@ -1,0 +1,148 @@
+@inject ICatalogAccessService CatalogAccessService
+
+<section class="panel" aria-labelledby="catalog-visibility">
+    <div class="panel__header">
+        <div>
+            <h2 id="catalog-visibility">Catalog visibility</h2>
+            <p class="lede">@Description</p>
+        </div>
+    </div>
+
+    <div class="panel__body">
+        <button type="button"
+                class="@SwitchClass"
+                role="switch"
+                aria-checked="@(Enabled ? "true" : "false")"
+                aria-label="Public catalog access"
+                disabled="@_isSaving"
+                @onclick="RequestToggleAsync">
+            <span class="visibility-switch__icon" aria-hidden="true">
+                @if (Enabled)
+                {
+                    <svg viewBox="0 0 20 20" focusable="false">
+                        <circle cx="10" cy="10" r="6.75" />
+                        <path d="M3.25 10h13.5" />
+                        <path d="M10 3.25c1.9 2 2.9 4.3 2.9 6.75s-1 4.75-2.9 6.75c-1.9-2-2.9-4.3-2.9-6.75s1-4.75 2.9-6.75Z" />
+                    </svg>
+                }
+                else
+                {
+                    <svg viewBox="0 0 20 20" focusable="false">
+                        <rect x="4.25" y="8.5" width="11.5" height="8" rx="2.25" />
+                        <path d="M7 8.5V6.25a3 3 0 0 1 6 0V8.5" />
+                        <path d="M10 11.75v2" />
+                    </svg>
+                }
+            </span>
+
+            <span class="visibility-switch__text">
+                <span class="visibility-switch__state">@(Enabled ? "Public" : "Private")</span>
+                <span class="visibility-switch__hint">@StateHint</span>
+            </span>
+
+            <span class="visibility-switch__track" aria-hidden="true">
+                <span class="visibility-switch__thumb"></span>
+            </span>
+        </button>
+
+        @if (_feedback is not null)
+        {
+            <p class="@FeedbackClass" role="status">@_feedback.Message</p>
+        }
+    </div>
+</section>
+
+<ConfirmDialog IsOpen="_showPublicConfirm"
+               Title="Make catalog public"
+               Message="Anyone with the publishable key will be able to read the whole catalog anonymously. Admin-only writes stay protected by RLS."
+               ConfirmLabel="Make public"
+               OnCancel="CloseConfirm"
+               OnConfirm="ConfirmPublicAsync" />
+
+@code {
+    private bool _isSaving;
+    private bool _showPublicConfirm;
+    private Feedback? _feedback;
+
+    [Parameter]
+    public bool Enabled { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> EnabledChanged { get; set; }
+
+    private string SwitchClass => Enabled
+        ? "visibility-switch visibility-switch--public"
+        : "visibility-switch visibility-switch--private";
+
+    private string FeedbackClass => _feedback?.IsError == true
+        ? "visibility-feedback visibility-feedback--error"
+        : "visibility-feedback";
+
+    private string Description => Enabled
+        ? "Anyone with the publishable key can read the catalog anonymously. Admin-only writes still remain protected by RLS."
+        : "Only admins can read the catalog. Everyone else sees a private-catalog message and the underlying SELECT requests are blocked by RLS.";
+
+    private string StateHint
+    {
+        get
+        {
+            if (_isSaving)
+            {
+                return "Saving...";
+            }
+
+            return Enabled ? "Anyone can read the catalog" : "Admins only";
+        }
+    }
+
+    // Opening up the whole catalog to anonymous readers is the one direction worth a second look;
+    // locking it back down is always safe, so that way applies straight away.
+    private Task RequestToggleAsync()
+    {
+        if (_isSaving)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!Enabled)
+        {
+            _showPublicConfirm = true;
+            _feedback = null;
+            return Task.CompletedTask;
+        }
+
+        return ApplyAsync(false);
+    }
+
+    private void CloseConfirm() => _showPublicConfirm = false;
+
+    private Task ConfirmPublicAsync()
+    {
+        _showPublicConfirm = false;
+        return ApplyAsync(true);
+    }
+
+    private async Task ApplyAsync(bool enabled)
+    {
+        try
+        {
+            _isSaving = true;
+            _feedback = null;
+            await CatalogAccessService.SetPublicCatalogEnabledAsync(enabled);
+            await EnabledChanged.InvokeAsync(enabled);
+            _feedback = new Feedback(
+                enabled ? "Public catalog access enabled." : "Public catalog access disabled.",
+                IsError: false);
+        }
+        catch (Exception ex)
+        {
+            _feedback = new Feedback(ex.Message, IsError: true);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private sealed record Feedback(string Message, bool IsError);
+}

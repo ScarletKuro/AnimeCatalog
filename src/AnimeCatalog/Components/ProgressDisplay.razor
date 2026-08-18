@@ -1,0 +1,11 @@
+<span class="progress-display">
+    @(TotalEpisodes is > 0 ? $"{EpisodesWatched} / {TotalEpisodes}" : EpisodesWatched.ToString())
+</span>
+
+@code {
+    [Parameter]
+    public int EpisodesWatched { get; set; }
+
+    [Parameter]
+    public int? TotalEpisodes { get; set; }
+}

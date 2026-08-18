@@ -1,0 +1,305 @@
+@page "/watch-next"
+@implements IDisposable
+@inject AuthService AuthService
+@inject CatalogService CatalogService
+@inject FranchiseGapService FranchiseGapService
+
+<PageTitle>Watch next · Anime Catalog</PageTitle>
+
+<section class="stack stack--wide">
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Watch next</p>
+            <h1>Watch next</h1>
+            <p class="lede">
+                Anime from franchises you have already watched that are not in your catalog, ranked by
+                AniList score. Built from AniList's own relations, so it works whether or not you grouped
+                anything into a franchise here.
+            </p>
+        </div>
+    </div>
+
+    @if (!AuthService.IsAuthenticated)
+    {
+        <ErrorState Title="Authentication required" Message="Sign in with GitHub before scanning for unwatched entries." />
+    }
+    else if (!AuthService.IsAdmin)
+    {
+        <ErrorState Title="Admin access required" Message="Your user is authenticated but is not present in app_admins." />
+    }
+    else if (!CatalogService.IsConfigured)
+    {
+        <ErrorState Title="Configuration required" Message="Configure Supabase before scanning your catalog." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Scan failed" Message="@_error" Retry="StartScanAsync" />
+    }
+    else
+    {
+        <section class="panel" aria-labelledby="missing-progress">
+            <div class="panel__header">
+                <h2 id="missing-progress">@ScanHeadline</h2>
+                <div class="button-row">
+                    @if (_isScanning)
+                    {
+                        <button type="button" class="button button--ghost" @onclick="CancelScan">Cancel</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="button button--primary" @onclick="StartScanAsync">Rescan</button>
+                    }
+                </div>
+            </div>
+
+            @* A percentage would be dishonest: the frontier grows as the walk discovers more titles. *@
+            <p class="lede">@ScanDetail</p>
+
+            @if (_scan?.WasTruncated == true)
+            {
+                <p class="panel__notice">
+                    The scan stopped at @FranchiseGapService.MaxNodes titles, so some very large franchises
+                    may be incomplete.
+                </p>
+            }
+
+            @if (_scan is not null && _scan.MissingCount > 0)
+            {
+                <div class="filters-card">
+                    <label class="field">
+                        <span class="field-label">Quality bar</span>
+                        <select class="select-input" value="@_qualityBar" @onchange="OnQualityBarChanged">
+                            <option value="0">Off</option>
+                            <option value="65">65</option>
+                            <option value="70">70</option>
+                            <option value="75">75</option>
+                            <option value="80">80</option>
+                            <option value="85">85</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Below the bar</span>
+                        <select class="select-input" value="@(_hideBelowBar ? "true" : "false")" @onchange="OnHideBelowBarChanged">
+                            <option value="false">Dim</option>
+                            <option value="true">Hide</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Format</span>
+                        <select class="select-input" value="@_format" @onchange="OnFormatChanged">
+                            <option value="">All formats</option>
+                            @foreach (var format in AvailableFormats)
+                            {
+                                <option value="@format">@MediaDisplayFormatter.FormatLabel(format)</option>
+                            }
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Not yet aired</span>
+                        <select class="select-input" value="@(_hideUnaired ? "true" : "false")" @onchange="OnHideUnairedChanged">
+                            <option value="false">Show</option>
+                            <option value="true">Hide</option>
+                        </select>
+                    </label>
+                </div>
+            }
+        </section>
+
+        @if (_scan is null && _isScanning)
+        {
+            <LoadingIndicator Text="Scanning your catalog..." />
+        }
+        else if (VisibleGroups.Count == 0 && !_isScanning)
+        {
+            <div class="empty-card">
+                <h3>@(_scan is null ? "Nothing scanned yet." : "Nothing missing.")</h3>
+                <p>
+                    @(_scan is null
+                        ? "Start a scan to look for unwatched entries in franchises you have already seen."
+                        : "Every anime AniList links to what you have watched is already in your catalog, or the filters above hide it.")
+                </p>
+            </div>
+        }
+        else
+        {
+            @foreach (var group in VisibleGroups)
+            {
+                <section class="panel" aria-label="@group.Title">
+                    <div class="panel__header">
+                        <div>
+                            <h2>@group.Title</h2>
+                            <p class="lede">
+                                You have @group.OwnedCount of @group.TotalCount.
+                                @* Naming the driver makes the ordering self-explanatory: groups rank by their
+                                   single best missing entry, never by an average. *@
+                                @if (group.BestScore is not null)
+                                {
+                                    <span>Ranked by its best missing entry, AniList @group.BestScore.</span>
+                                }
+                            </p>
+                        </div>
+                        @if (group.FranchiseSlug is not null)
+                        {
+                            <NavLink href="@($"franchise/{group.FranchiseSlug}")" class="button button--inline">Open franchise</NavLink>
+                        }
+                    </div>
+
+                    <div class="poster-grid">
+                        @foreach (var item in FilterItems(group))
+                        {
+                            <PosterCard Title="@item.Title"
+                                        CoverUrl="@item.Media.CoverImage?.BestUrl"
+                                        Subtitle="@MediaDisplayFormatter.FormatAndYear(item.Media.Format, item.Media.SeasonYear)"
+                                        Href="@item.SiteUrl"
+                                        IsExternal="true"
+                                        BadgeText="@item.DisplayLabel"
+                                        BadgeVariant="@(item.IsReleased ? "neutral" : "warm")"
+                                        IsDimmed="@IsBelowBar(item)">
+                                <Footer>
+                                    <span>@ScoreLabel(item)</span>
+                                    @if (item.DiscoveredFrom is not null)
+                                    {
+                                        <span class="empty-note">via @item.DiscoveredFrom</span>
+                                    }
+                                </Footer>
+                            </PosterCard>
+                        }
+                    </div>
+                </section>
+            }
+        }
+    }
+</section>
+
+@code {
+    private bool _isScanning;
+    private string? _error;
+    private FranchiseGapScanViewModel? _scan;
+    private CancellationTokenSource? _cts;
+
+    private int _qualityBar = 75;
+    private bool _hideBelowBar;
+    private string _format = string.Empty;
+    private bool _hideUnaired;
+
+    protected override Task OnInitializedAsync() => StartScanAsync();
+
+    private async Task StartScanAsync()
+    {
+        // Guarded as well as hidden: the walk costs dozens of AniList requests against a shared
+        // per-IP rate limit, so it must not start for someone who cannot use the results anyway.
+        if (!AuthService.IsAdmin || !CatalogService.IsConfigured)
+        {
+            return;
+        }
+
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        _error = null;
+        _isScanning = true;
+        _scan = null;
+
+        try
+        {
+            var snapshot = await CatalogService.GetSnapshotAsync(token);
+
+            // Each report is one AniList batch, so groups appear and re-sort as the walk proceeds.
+            var progress = new Progress<FranchiseGapScanViewModel>(partial =>
+            {
+                _scan = partial;
+                _ = InvokeAsync(StateHasChanged);
+            });
+
+            _scan = await FranchiseGapService.ScanAsync(snapshot, progress, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelling keeps whatever the last progress report produced.
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isScanning = false;
+            if (_cts is not null && !_cts.IsCancellationRequested)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void CancelScan()
+    {
+        _cts?.Cancel();
+        _isScanning = false;
+    }
+
+    private string ScanHeadline => _scan is null
+        ? "Scanning"
+        : $"{VisibleMissingCount} missing across {VisibleGroups.Count} franchises";
+
+    private string ScanDetail => _isScanning
+        ? $"Scanned {_scan?.ScannedCount ?? 0} titles so far. Results appear as they are found."
+        : _scan is null
+            ? "Not scanned yet."
+            : $"Scanned {_scan.ScannedCount} titles.";
+
+    private IReadOnlyList<FranchiseGapGroupViewModel> VisibleGroups =>
+        _scan is null
+            ? []
+            : _scan.Groups.Where(group => FilterItems(group).Count > 0).ToList();
+
+    private int VisibleMissingCount => VisibleGroups.Sum(group => FilterItems(group).Count);
+
+    private IReadOnlyList<string> AvailableFormats =>
+        _scan is null
+            ? []
+            : _scan.Groups
+                .SelectMany(group => group.Missing)
+                .Select(item => item.Media.Format)
+                .Where(format => !string.IsNullOrWhiteSpace(format))
+                .Select(format => format!)
+                .Distinct()
+                .OrderBy(format => format)
+                .ToList();
+
+    private IReadOnlyList<MissingAnimeViewModel> FilterItems(FranchiseGapGroupViewModel group) =>
+        group.Missing
+            .Where(item => !_hideBelowBar || !IsBelowBar(item))
+            .Where(item => string.IsNullOrEmpty(_format) || string.Equals(item.Media.Format, _format, StringComparison.OrdinalIgnoreCase))
+            .Where(item => !_hideUnaired || item.IsReleased)
+            .ToList();
+
+    // Unrated titles are usually unaired, so they sit below the bar rather than being treated as zero.
+    private bool IsBelowBar(MissingAnimeViewModel item) =>
+        _qualityBar > 0 && (item.Score is null || item.Score < _qualityBar);
+
+    private void OnQualityBarChanged(ChangeEventArgs args) =>
+        _qualityBar = int.TryParse(args.Value?.ToString(), out var value) ? value : 0;
+
+    private void OnHideBelowBarChanged(ChangeEventArgs args) =>
+        _hideBelowBar = bool.TryParse(args.Value?.ToString(), out var value) && value;
+
+    private static string ScoreLabel(MissingAnimeViewModel item) =>
+        item.Score is null ? "Not rated yet" : $"AniList {item.Score}";
+
+    private void OnFormatChanged(ChangeEventArgs args) =>
+        _format = args.Value?.ToString() ?? string.Empty;
+
+    private void OnHideUnairedChanged(ChangeEventArgs args) =>
+        _hideUnaired = bool.TryParse(args.Value?.ToString(), out var value) && value;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

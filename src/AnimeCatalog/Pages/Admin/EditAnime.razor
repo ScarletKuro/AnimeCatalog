@@ -1,0 +1,100 @@
+@page "/admin/edit/{Id:long}"
+@inject CatalogService CatalogService
+@inject AdminCatalogService AdminCatalogService
+@inject NavigationManager NavigationManager
+@inject AuthService AuthService
+
+<PageTitle>Edit anime</PageTitle>
+
+<section class="stack">
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Edit anime entry</h1>
+            <p class="lede">Adjust cached metadata, move the entry between franchises, and update score or progress.</p>
+        </div>
+    </div>
+
+    @if (!AuthService.IsAdmin)
+    {
+        <ErrorState Title="Admin access required" Message="Only application admins can edit entries." />
+    }
+    else if (_isLoading)
+    {
+        <LoadingIndicator Text="Loading anime entry..." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Edit anime failed" Message="@_error" Retry="LoadAsync" />
+    }
+    else if (_model is not null)
+    {
+        <AnimeEditorForm
+            Model="_model"
+            Franchises="_franchises"
+            IsSaving="_isSaving"
+            SubmitLabel="Save changes"
+            SavingLabel="Saving..."
+            OnValidSubmit="SaveAsync">
+            <FooterActions>
+                <NavLink href="@($"anime/{Id}")" class="button button--ghost">Back to details</NavLink>
+            </FooterActions>
+        </AnimeEditorForm>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private AnimeEditorModel? _model;
+    private IReadOnlyList<Franchise> _franchises = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            _error = null;
+            _model = await CatalogService.GetEditorModelAsync(Id);
+            _franchises = await CatalogService.GetFranchisesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_model is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _isSaving = true;
+            _error = null;
+            var id = await AdminCatalogService.SaveAsync(_model);
+            NavigationManager.NavigateTo($"anime/{id}");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

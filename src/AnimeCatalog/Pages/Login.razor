@@ -1,0 +1,100 @@
+@page "/login"
+@inject AuthService AuthService
+@inject BrowserStorageService BrowserStorageService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Login</PageTitle>
+
+<section class="stack stack--wide">
+    <div class="hero-card">
+        <p class="eyebrow">Owner access</p>
+        <h1>GitHub sign-in for catalog administration</h1>
+        <p class="lede">Read access depends on the current catalog visibility setting. Write access remains enforced by Supabase RLS and is available only to authenticated admins.</p>
+    </div>
+
+    @if (!AuthService.IsConfigured)
+    {
+        <ErrorState Title="Supabase auth is not configured" Message="Set Supabase.Url and Supabase.PublishableKey in wwwroot/appsettings.json before using login." />
+    }
+    else if (_isCompletingCallback)
+    {
+        <LoadingIndicator Text="Completing GitHub sign-in..." />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Title="Login failed" Message="@_error" />
+    }
+    else if (AuthService.IsAuthenticated)
+    {
+        <div class="panel">
+            <div class="panel__header">
+                <h2>Signed in</h2>
+            </div>
+            <p>You are signed in as <strong>@AuthService.CurrentSession?.User.DisplayName</strong>.</p>
+            <div class="button-row">
+                <NavLink href="admin" class="button button--primary">Go to admin</NavLink>
+                <button type="button" class="button button--ghost" @onclick="LogoutAsync">Sign out</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="panel">
+            <div class="panel__header">
+                <h2>GitHub OAuth</h2>
+            </div>
+            <p>Use the GitHub provider configured in Supabase Auth. The session is stored in browser storage and refreshed through Supabase Auth.</p>
+            <button type="button" class="button button--primary" @onclick="SignInAsync">Sign in with GitHub</button>
+        </div>
+    }
+</section>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Code { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private bool _isCompletingCallback;
+    private string? _error;
+    private bool _callbackHandled;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_callbackHandled || string.IsNullOrWhiteSpace(Code))
+        {
+            return;
+        }
+
+        try
+        {
+            _isCompletingCallback = true;
+            await AuthService.HandleOAuthCallbackAsync(Code);
+            _callbackHandled = true;
+            var returnUrl = await AuthService.GetAndClearReturnUrlAsync() ?? "admin";
+            // history.replaceState ignores <base href>, so hand it an absolute path.
+            await BrowserStorageService.ReplaceUrlAsync(NavigationManager.ToAbsoluteUri(returnUrl).PathAndQuery);
+            NavigationManager.NavigateTo(returnUrl);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isCompletingCallback = false;
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        _error = null;
+        await AuthService.StartGitHubSignInAsync(ReturnUrl);
+    }
+
+    private async Task LogoutAsync()
+    {
+        await AuthService.LogoutAsync();
+    }
+}

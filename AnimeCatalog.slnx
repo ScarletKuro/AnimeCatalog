@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AnimeCatalog/AnimeCatalog.csproj" />
+    <Folder Name="/src/tests/">
+      <Project Path="src/tests/AnimeCatalog.Tests/AnimeCatalog.Tests.csproj" />
+    </Folder>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="src/tests/AnimeCatalog.Tests/AnimeCatalog.Tests.csproj" />
+  </Folder>
+</Solution>

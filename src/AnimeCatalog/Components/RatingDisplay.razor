@@ -1,0 +1,9 @@
+<span class="rating-display">
+    <span class="rating-display__icon"><StarIcon /></span>
+    <span>@(Score is null ? "Unrated" : Score.Value.ToString("0.0"))</span>
+</span>
+
+@code {
+    [Parameter]
+    public decimal? Score { get; set; }
+}

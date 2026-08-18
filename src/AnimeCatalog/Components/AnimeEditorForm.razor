@@ -1,0 +1,182 @@
+<EditForm Model="Model" OnValidSubmit="OnValidSubmit" OnInvalidSubmit="OnInvalidSubmit" class="editor-form">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="validation-summary" />
+
+    <section class="panel">
+        <div class="panel__header">
+            <div>
+                <h2>Entry details</h2>
+                <p class="lede">Adjust cached metadata, choose status, and set display order before saving.</p>
+            </div>
+        </div>
+
+        <div class="editor-grid">
+            <label class="field"><span class="field-label">Romaji title</span><input class="text-input" @bind="Model.TitleRomaji" /></label>
+            <label class="field"><span class="field-label">English title</span><input class="text-input" @bind="Model.TitleEnglish" /></label>
+            <label class="field"><span class="field-label">Native title</span><input class="text-input" @bind="Model.TitleNative" /></label>
+            <label class="field"><span class="field-label">Format</span><input class="text-input" @bind="Model.Format" /></label>
+            <label class="field"><span class="field-label">Season</span><input class="text-input" @bind="Model.Season" /></label>
+            <label class="field"><span class="field-label">Year</span><InputNumber class="text-input" @bind-Value="Model.SeasonYear" /></label>
+            <label class="field"><span class="field-label">Episodes</span><InputNumber class="text-input" @bind-Value="Model.Episodes" min="0" /></label>
+            <label class="field"><span class="field-label">Display order</span><InputNumber class="text-input" @bind-Value="Model.DisplayOrder" /></label>
+            <div class="field">
+                <span class="field-label">Status</span>
+                <CatalogStatusPicker Value="Model.Status" ValueChanged="HandleStatusChangedAsync" />
+            </div>
+            <div class="field">
+                <span class="field-label">Score</span>
+                <ScorePicker @bind-Value="Model.Score" />
+            </div>
+            <label class="field">
+                <span class="field-label">Episodes watched</span>
+                <InputNumber class="text-input" @bind-Value="Model.EpisodesWatched" min="0" max="@Model.Episodes" />
+            </label>
+            <label class="field field--wide"><span class="field-label">Cover URL</span><input class="text-input" @bind="Model.CoverUrl" /></label>
+            <label class="field field--wide"><span class="field-label">Notes</span><InputTextArea class="text-area" @bind-Value="Model.Notes" /></label>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel__header"><h2>Franchise assignment</h2></div>
+        <div class="editor-grid">
+            <label class="field">
+                <span class="field-label">Mode</span>
+                <select class="select-input" value="@Model.FranchiseAssignmentMode" @onchange="HandleFranchiseAssignmentModeChanged">
+                    <option value="@FranchiseAssignmentMode.None">No franchise</option>
+                    <option value="@FranchiseAssignmentMode.Existing">Existing franchise</option>
+                    <option value="@FranchiseAssignmentMode.CreateNew">Create new franchise</option>
+                </select>
+            </label>
+
+            @if (Model.FranchiseAssignmentMode == FranchiseAssignmentMode.Existing)
+            {
+                <div class="field">
+                    <span class="field-label">Franchise</span>
+                    <FranchisePicker Franchises="Franchises" @bind-Value="Model.FranchiseId" SuggestedTitle="@Model.SuggestedFranchiseTitle" />
+                </div>
+            }
+            else if (Model.FranchiseAssignmentMode == FranchiseAssignmentMode.CreateNew)
+            {
+                <div class="field field--wide">
+                    <label class="field"><span class="field-label">New franchise title</span><input class="text-input" @bind="Model.NewFranchiseTitle" /></label>
+                    <label class="field field--wide"><span class="field-label">Description</span><InputTextArea class="text-area" @bind-Value="Model.NewFranchiseDescription" /></label>
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (Model.RelatedSuggestions.Count > 0)
+    {
+        <section class="panel">
+            <div class="panel__header"><h2>Suggested related entries</h2></div>
+            <ul class="relation-list">
+                @foreach (var relation in Model.RelatedSuggestions)
+                {
+                    <li class="franchise-entry-list__item">
+                        <div>
+                            <span class="franchise-entry-list__title">@relation.Title</span>
+                            <div class="franchise-entry-list__subline">
+                                <span class="chip chip--muted">@relation.DisplayLabel</span>
+                                @if (MediaDisplayFormatter.FormatAndYear(relation.Format, relation.SeasonYear) is { } meta)
+                                {
+                                    <span class="chip">@meta</span>
+                                }
+                            </div>
+                        </div>
+                        @if (relation.IsInCatalog)
+                        {
+                            <NavLink href="@($"anime/{relation.LocalAnimeEntryId}")" class="button button--inline">Already added</NavLink>
+                        }
+                        else if (OnSuggestionSelected.HasDelegate)
+                        {
+                            @* Replaces the current draft, exactly as picking another search result does. *@
+                            <button type="button" class="button button--ghost"
+                                    @onclick="() => OnSuggestionSelected.InvokeAsync(relation)">Add this instead</button>
+                        }
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    <div class="button-row">
+        <button type="submit" class="button button--primary" disabled="@IsSaving">@SubmitButtonText</button>
+        @if (FooterActions is not null)
+        {
+            @FooterActions
+        }
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public AnimeEditorModel Model { get; set; } = default!;
+
+    [Parameter]
+    public IReadOnlyList<Franchise> Franchises { get; set; } = [];
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public string SubmitLabel { get; set; } = "Save";
+
+    [Parameter]
+    public string SavingLabel { get; set; } = "Saving...";
+
+    [Parameter]
+    public EventCallback OnValidSubmit { get; set; }
+
+    /// <summary>
+    /// Raised when submit was rejected by validation. Lets a host that varies its behaviour per
+    /// submit button clear that intent instead of carrying it into the next attempt.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnInvalidSubmit { get; set; }
+
+    [Parameter]
+    public RenderFragment? FooterActions { get; set; }
+
+    /// <summary>
+    /// Raised when a not-yet-added suggestion is picked. Left unset (as by the edit page) the
+    /// suggestions stay read-only.
+    /// </summary>
+    [Parameter]
+    public EventCallback<RelatedAnimeSuggestion> OnSuggestionSelected { get; set; }
+
+    private string SubmitButtonText => IsSaving ? SavingLabel : SubmitLabel;
+
+    private Task HandleStatusChangedAsync(CatalogStatus status)
+    {
+        if (Model.Status == status)
+        {
+            return Task.CompletedTask;
+        }
+
+        Model.Status = status;
+
+        if (status == CatalogStatus.Completed && Model.Episodes is not null)
+        {
+            Model.EpisodesWatched = Model.Episodes.Value;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void HandleFranchiseAssignmentModeChanged(ChangeEventArgs args)
+    {
+        if (!Enum.TryParse<FranchiseAssignmentMode>(args.Value?.ToString(), out var mode))
+        {
+            return;
+        }
+
+        Model.FranchiseAssignmentMode = mode;
+
+        if (mode == FranchiseAssignmentMode.CreateNew &&
+            string.IsNullOrWhiteSpace(Model.NewFranchiseTitle) &&
+            !string.IsNullOrWhiteSpace(Model.SuggestedNewFranchiseTitle))
+        {
+            Model.NewFranchiseTitle = Model.SuggestedNewFranchiseTitle;
+        }
+    }
+}

@@ -1,0 +1,69 @@
+@* Renders nothing when there is nothing to show; callers own their own empty state. *@
+@if (Items.Count > 0)
+{
+    <ul class="chip-list" aria-label="@Label">
+        @foreach (var item in VisibleItems)
+        {
+            <li>
+                @if (!string.IsNullOrWhiteSpace(item.Href))
+                {
+                    <a class="@ChipClass(item) chip--link"
+                       href="@item.Href"
+                       target="@(item.IsExternal ? "_blank" : null)"
+                       rel="@(item.IsExternal ? "noopener noreferrer" : null)">
+                        @ChipBody(item)
+                        @if (item.IsExternal)
+                        {
+                            <span class="sr-only"> (opens in a new tab)</span>
+                        }
+                    </a>
+                }
+                else
+                {
+                    <span class="@ChipClass(item)">@ChipBody(item)</span>
+                }
+            </li>
+        }
+
+        @if (HiddenCount > 0)
+        {
+            <li><span class="chip chip--muted">+@HiddenCount</span></li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<ChipItem> Items { get; set; }
+
+    /// <summary>Becomes the list's accessible name.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Caps the visible chips and appends a "+N" chip for the remainder.</summary>
+    [Parameter]
+    public int? Max { get; set; }
+
+    private IEnumerable<ChipItem> VisibleItems => Max is > 0 ? Items.Take(Max.Value) : Items;
+
+    private int HiddenCount => Max is > 0 && Items.Count > Max.Value ? Items.Count - Max.Value : 0;
+
+    private static string ChipClass(ChipItem item) => $"chip chip--{item.Variant}";
+
+    private RenderFragment ChipBody(ChipItem item) => __builder =>
+    {
+        <span class="chip__label">@item.Label</span>
+
+        @if (!string.IsNullOrWhiteSpace(item.Value))
+        {
+            <span class="chip__value">@item.Value</span>
+        }
+
+        @* The bar is decorative; the number is announced through the adjacent screen-reader text. *@
+        @if (item.Rank is not null)
+        {
+            <span class="chip__rank" style="@($"--rank:{Math.Clamp(item.Rank.Value, 0, 100)}%")" aria-hidden="true"></span>
+            <span class="sr-only"> @Math.Clamp(item.Rank.Value, 0, 100)% relevance</span>
+        }
+    };
+}

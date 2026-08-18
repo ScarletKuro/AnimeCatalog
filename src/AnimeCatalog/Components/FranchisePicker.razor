@@ -1,0 +1,123 @@
+<div class="franchise-picker">
+    <div class="franchise-picker__field">
+        <input
+            class="text-input"
+            placeholder="Search franchise..."
+            value="@_query"
+            @oninput="HandleInput" />
+
+        @if (SelectedFranchise is not null)
+        {
+            <button type="button" class="button button--ghost franchise-picker__clear" @onclick="ClearAsync">Clear</button>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(SuggestedTitle))
+    {
+        <p class="franchise-picker__hint">Suggested: @SuggestedTitle</p>
+    }
+
+    @if (ShowResults && FilteredFranchises.Count > 0)
+    {
+        <div class="franchise-picker__results">
+            @foreach (var franchise in FilteredFranchises)
+            {
+                var isSelected = Value == franchise.Id;
+                <button
+                    type="button"
+                    class="@(isSelected ? "franchise-picker__option franchise-picker__option--selected" : "franchise-picker__option")"
+                    @onclick="() => SelectAsync(franchise)">
+                    <strong>@franchise.Title</strong>
+                    @if (!string.IsNullOrWhiteSpace(franchise.Description))
+                    {
+                        <span>@franchise.Description</span>
+                    }
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string _query = string.Empty;
+    private long? _syncedFranchiseId;
+
+    [Parameter]
+    public IReadOnlyList<Franchise> Franchises { get; set; } = [];
+
+    [Parameter]
+    public long? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<long?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string? SuggestedTitle { get; set; }
+
+    private Franchise? SelectedFranchise => Value is null ? null : Franchises.FirstOrDefault(item => item.Id == Value.Value);
+
+    // Keeps the result list collapsed unless the query is actually a search: empty means
+    // nothing to narrow, and a query equal to the selected title means we just picked it.
+    // Typing something else re-opens the list so a selection can still be changed.
+    private bool ShowResults =>
+        !string.IsNullOrWhiteSpace(_query) &&
+        !string.Equals(_query, SelectedFranchise?.Title, StringComparison.Ordinal);
+
+    private IReadOnlyList<Franchise> FilteredFranchises
+    {
+        get
+        {
+            var query = _query.Trim();
+            IEnumerable<Franchise> items = Franchises;
+
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                items = items.Where(item =>
+                    item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    item.Slug.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(item.Description) && item.Description.Contains(query, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            return items
+                .OrderBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
+                .Take(10)
+                .ToList();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (_syncedFranchiseId == Value)
+        {
+            return;
+        }
+
+        _syncedFranchiseId = Value;
+
+        if (SelectedFranchise is not null)
+        {
+            _query = SelectedFranchise.Title;
+        }
+        else if (Value is null)
+        {
+            _query = string.Empty;
+        }
+    }
+
+    private void HandleInput(ChangeEventArgs args)
+    {
+        _query = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task SelectAsync(Franchise franchise)
+    {
+        _query = franchise.Title;
+        await ValueChanged.InvokeAsync(franchise.Id);
+    }
+
+    private async Task ClearAsync()
+    {
+        _query = string.Empty;
+        await ValueChanged.InvokeAsync(null);
+    }
+}

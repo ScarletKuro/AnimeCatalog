@@ -1,0 +1,19 @@
+<div class="error-card">
+    <h3>@Title</h3>
+    <p>@Message</p>
+    @if (Retry.HasDelegate)
+    {
+        <button type="button" class="button button--ghost" @onclick="Retry">Retry</button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Something went wrong";
+
+    [Parameter]
+    public string Message { get; set; } = "The requested data could not be loaded.";
+
+    [Parameter]
+    public EventCallback Retry { get; set; }
+}

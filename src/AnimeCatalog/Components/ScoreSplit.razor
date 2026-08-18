@@ -1,0 +1,34 @@
+@* Your score and AniList's are on different scales (/10 vs /100). Three things keep them apart:
+   the label names the owner, the unit is always shown, and only the personal cell has a star. *@
+<div class="score-split">
+    <div class="score-split__cell score-split__cell--personal">
+        <span class="score-split__label">@PersonalLabel</span>
+        <span class="score-split__value">
+            <span class="rating-display__icon"><StarIcon /></span>
+            @(PersonalScore?.ToString("0.0") ?? "—")<span class="score-split__unit"> / 10</span>
+        </span>
+    </div>
+
+    <div class="score-split__cell score-split__cell--community">
+        <span class="score-split__label">@CommunityLabel</span>
+        <span class="score-split__value">
+            @(CommunityScore?.ToString() ?? "—")<span class="score-split__unit"> / 100</span>
+        </span>
+    </div>
+</div>
+
+@code {
+    /// <summary>Your catalog score, 0-10.</summary>
+    [Parameter]
+    public decimal? PersonalScore { get; set; }
+
+    /// <summary>AniList's community average, 0-100.</summary>
+    [Parameter]
+    public int? CommunityScore { get; set; }
+
+    [Parameter]
+    public string PersonalLabel { get; set; } = "Your score";
+
+    [Parameter]
+    public string CommunityLabel { get; set; } = "AniList average";
+}
