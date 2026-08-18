@@ -1,0 +1,176 @@
+@inject BrowserStorageService BrowserStorage
+
+@if (Max is null)
+{
+    @* No known total (currently-airing or unenriched entries), so there is no range to
+       enumerate. Typing stays the only honest option here rather than inventing a ceiling. *@
+    @* Labelled here rather than by the host: the field's .field-label span no longer wraps the
+       control, since the grid branch is a group and not a single labelable input. *@
+    <input class="text-input"
+           type="number"
+           min="0"
+           aria-label="Episodes watched"
+           value="@Value"
+           @onchange="HandleManualChangeAsync" />
+}
+else
+{
+    <div class="episode-picker">
+        @* Managed focus instead of one tab stop per option: a 1000-episode entry would
+           otherwise bury every control after it behind a thousand tab presses. The group
+           takes the tab stop and aria-activedescendant reports which option is current. *@
+        <div class="episode-picker__options"
+             role="radiogroup"
+             aria-label="Episodes watched"
+             tabindex="0"
+             aria-activedescendant="@OptionId(Value)"
+             @onkeydown="HandleKeyDownAsync"
+             @ref="_options">
+            @for (var episode = 0; episode <= Ceiling; episode++)
+            {
+                var value = episode;
+                var isSelected = Value == value;
+                var isWatched = value > 0 && value <= Value;
+
+                <button type="button"
+                        id="@OptionId(value)"
+                        class="@OptionClass(isSelected, isWatched)"
+                        role="radio"
+                        tabindex="-1"
+                        aria-checked="@isSelected"
+                        aria-label="@(value == 0 ? "No episodes watched" : $"Set episodes watched to {value}")"
+                        @onclick="() => SelectAsync(value)">
+                    @value
+                </button>
+            }
+        </div>
+
+        <p class="episode-picker__value"><ProgressDisplay EpisodesWatched="Value" TotalEpisodes="Max" /></p>
+    </div>
+}
+
+@code {
+    private readonly string _idPrefix = $"episode-picker-{Guid.NewGuid():N}";
+    private ElementReference _options;
+    private int? _scrolledValue;
+    private bool _skipScroll;
+
+    [Parameter]
+    public int Value { get; set; }
+
+    /// <summary>Total episodes for the entry. Null renders a plain number field instead of a range.</summary>
+    [Parameter]
+    public int? Max { get; set; }
+
+    [Parameter]
+    public EventCallback<int> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Whether the count is worth offering at all. A Completed entry means every episode, and
+    /// selecting Completed already fills the count in, so a range would only offer ways to
+    /// contradict the status. Hosts gate the whole field on this rather than the picker
+    /// blanking itself, since the field label is theirs to hide. An unknown total is the
+    /// exception: the auto-fill has nothing to copy, so the count stays editable.
+    /// </summary>
+    public static bool IsEditable(CatalogStatus status, int? max) =>
+        status != CatalogStatus.Completed || max is null;
+
+    // Stale rows can carry more watched episodes than the total (the total was corrected
+    // downward later), so the range stretches to keep the current value selectable instead
+    // of leaving nothing highlighted.
+    private int Ceiling => Math.Max(Max ?? 0, Value);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The number-field branch renders no scroll track, so there is nothing to centre.
+        if (Max is null)
+        {
+            return;
+        }
+
+        // Clicking a visible option must not yank the list out from under the cursor. A value
+        // that arrived through parameters (status -> Completed jumps to the total) must scroll.
+        // The flag is consumed before the early return below so a click the parent rejects
+        // cannot leave it set and swallow the next parameter-driven scroll.
+        var skip = _skipScroll;
+        _skipScroll = false;
+
+        if (_scrolledValue == Value)
+        {
+            return;
+        }
+
+        _scrolledValue = Value;
+
+        if (skip)
+        {
+            return;
+        }
+
+        await BrowserStorage.ScrollSelectedOptionIntoViewAsync(_options);
+    }
+
+    private string OptionId(int episode) => $"{_idPrefix}-{episode}";
+
+    private static string OptionClass(bool isSelected, bool isWatched)
+    {
+        var classes = "episode-picker__option";
+
+        if (isWatched)
+        {
+            classes += " episode-picker__option--watched";
+        }
+
+        if (isSelected)
+        {
+            classes += " episode-picker__option--selected";
+        }
+
+        return classes;
+    }
+
+    private Task SelectAsync(int episodes)
+    {
+        if (Value == episodes)
+        {
+            return Task.CompletedTask;
+        }
+
+        _skipScroll = true;
+        return SetAsync(episodes);
+    }
+
+    // ArrowUp/ArrowDown are left to the browser: the column count comes from CSS auto-fit, so
+    // the component cannot know what "one row up" means. Native scrolling is the better answer.
+    private Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        var target = args.Key switch
+        {
+            "ArrowLeft" => Value - 1,
+            "ArrowRight" => Value + 1,
+            "Home" => 0,
+            "End" => Ceiling,
+            _ => Value
+        };
+
+        target = Math.Clamp(target, 0, Ceiling);
+
+        return target == Value ? Task.CompletedTask : SetAsync(target);
+    }
+
+    private Task HandleManualChangeAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var episodes) || episodes < 0 || episodes == Value)
+        {
+            return Task.CompletedTask;
+        }
+
+        return SetAsync(episodes);
+    }
+
+    private Task SetAsync(int episodes)
+    {
+        Value = episodes;
+        return ValueChanged.InvokeAsync(episodes);
+    }
+}

@@ -42,6 +42,12 @@ public sealed class BrowserStorageService : IAsyncDisposable
         await module.InvokeVoidAsync("scrollElementIntoView", element);
     }
 
+    public async Task ScrollSelectedOptionIntoViewAsync(ElementReference container)
+    {
+        var module = await _moduleTask.Value;
+        await module.InvokeVoidAsync("scrollSelectedOptionIntoView", container);
+    }
+
     public async Task ShowModalDialogAsync(ElementReference element)
     {
         var module = await _moduleTask.Value;

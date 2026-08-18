@@ -76,3 +76,22 @@ export function scrollElementIntoView(element) {
         inline: "nearest"
     });
 }
+
+// Scrolls only the container, never the page: the option grid is a nested scroller, and
+// element.scrollIntoView() would drag the whole document to it. getBoundingClientRect deltas
+// are used instead of offsetTop so the container needs no positioning context of its own.
+export function scrollSelectedOptionIntoView(container) {
+    if (!container) {
+        return;
+    }
+
+    const selected = container.querySelector('[aria-checked="true"]');
+    if (!selected) {
+        return;
+    }
+
+    const containerBox = container.getBoundingClientRect();
+    const selectedBox = selected.getBoundingClientRect();
+
+    container.scrollTop += (selectedBox.top - containerBox.top) - (containerBox.height - selectedBox.height) / 2;
+}

@@ -105,15 +105,17 @@
                                 <span class="field-label">Score</span>
                                 <ScorePicker Value="_editScore" ValueChanged="HandleScoreChangedAsync" />
                             </div>
-                            <label class="field">
-                                <span class="field-label">Episodes watched</span>
-                                <input class="text-input"
-                                       type="number"
-                                       min="0"
-                                       max="@_details.AnimeEntry.Episodes"
-                                       value="@_editEpisodesWatched"
-                                       @onchange="HandleEpisodesChanged" />
-                            </label>
+                            @* The StatMeter below is the readout, so a Completed entry drops the
+                               field entirely instead of repeating the same count twice. *@
+                            @if (EpisodePicker.IsEditable(_editStatus, _details.AnimeEntry.Episodes))
+                            {
+                                <div class="field">
+                                    <span class="field-label">Episodes watched</span>
+                                    <EpisodePicker Value="_editEpisodesWatched"
+                                                   Max="_details.AnimeEntry.Episodes"
+                                                   ValueChanged="HandleEpisodesChangedAsync" />
+                                </div>
+                            }
 
                             <div class="button-row">
                                 <button type="button"
@@ -136,9 +138,11 @@
                             </div>
                         }
 
+                        @* Tracks the pending edit for admins: it is the only place the count is
+                           reported, so it has to follow the picker instead of lagging until Save. *@
                         <StatMeter Label="Episodes watched"
-                                   Value="_details.CatalogEntry.EpisodesWatched"
-                                   Max="@(_details.AnimeEntry.Episodes ?? _details.CatalogEntry.EpisodesWatched)"
+                                   Value="DisplayedEpisodesWatched"
+                                   Max="@(_details.AnimeEntry.Episodes ?? DisplayedEpisodesWatched)"
                                    ValueText="@EpisodeProgressText"
                                    Variant="success" />
 
@@ -578,16 +582,17 @@
         return Task.CompletedTask;
     }
 
-    private void HandleEpisodesChanged(ChangeEventArgs args)
+    private Task HandleEpisodesChangedAsync(int episodes)
     {
-        if (!int.TryParse(args.Value?.ToString(), out var episodes) || episodes < 0)
+        if (_editEpisodesWatched == episodes)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         _editEpisodesWatched = episodes;
         _hasPendingEdits = true;
         _saveMessage = null;
+        return Task.CompletedTask;
     }
 
     private async Task SaveCatalogEntryAsync()
@@ -673,12 +678,16 @@
     private string DateRangeText =>
         $"{_details!.AnimeEntry.StartDate?.ToString("yyyy-MM-dd") ?? "?"} → {_details.AnimeEntry.EndDate?.ToString("yyyy-MM-dd") ?? "?"}";
 
+    // Admins see what they are about to save; everyone else sees what is stored.
+    private int DisplayedEpisodesWatched =>
+        AuthService.IsAdmin ? _editEpisodesWatched : _details!.CatalogEntry.EpisodesWatched;
+
     private string EpisodeProgressText
     {
         get
         {
             var total = _details!.AnimeEntry.Episodes?.ToString() ?? "?";
-            return $"{_details.CatalogEntry.EpisodesWatched} / {total}";
+            return $"{DisplayedEpisodesWatched} / {total}";
         }
     }
 

@@ -1,16 +1,20 @@
 using AnimeCatalog.Components;
+using AnimeCatalog.Infrastructure;
 using AnimeCatalog.Models;
 using AnimeCatalog.ViewModels;
+using AngleSharp.Dom;
 using Bunit;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 
 namespace AnimeCatalog.Tests.Components;
 
 public sealed class AnimeEditorFormTests
 {
     [Fact]
-    public void CompletedStatus_FillsWatchedEpisodesToTotalEpisodes()
+    public async Task CompletedStatus_FillsWatchedEpisodesToTotalEpisodes()
     {
-        using var context = new BunitContext();
+        await using var context = CreateContext();
         var model = CreateModel();
 
         var cut = context.Render<AnimeEditorForm>(parameters => parameters
@@ -26,9 +30,9 @@ public sealed class AnimeEditorFormTests
     }
 
     [Fact]
-    public void SwitchingAwayFromCompleted_DoesNotEraseProgress()
+    public async Task SwitchingAwayFromCompleted_DoesNotEraseProgress()
     {
-        using var context = new BunitContext();
+        await using var context = CreateContext();
         var model = CreateModel();
 
         var cut = context.Render<AnimeEditorForm>(parameters => parameters
@@ -47,9 +51,9 @@ public sealed class AnimeEditorFormTests
     }
 
     [Fact]
-    public void ExistingFranchiseSuggestion_HidesWhenMissingAndShowsActualTitle()
+    public async Task ExistingFranchiseSuggestion_HidesWhenMissingAndShowsActualTitle()
     {
-        using var context = new BunitContext();
+        await using var context = CreateContext();
         var hiddenSuggestionModel = CreateModel();
         hiddenSuggestionModel.FranchiseAssignmentMode = FranchiseAssignmentMode.Existing;
         hiddenSuggestionModel.SuggestedFranchiseTitle = null;
@@ -70,6 +74,67 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
         Assert.Contains("Suggested: Code Geass", shownCut.Markup);
+    }
+
+    [Fact]
+    public async Task CorrectingTotalEpisodesWhileCompleted_KeepsWatchedCountAtTheNewTotal()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        cut.FindAll(".status-picker__option")
+            .Single(button => button.TextContent.Contains("Completed", StringComparison.Ordinal))
+            .Click();
+
+        // The picker offers no range while Completed, so nothing else would catch the drift.
+        cut.FindAll("input[type=number]")
+            .First(input => input.GetAttribute("value") == "25")
+            .Change("26");
+
+        Assert.Equal(26, model.Episodes);
+        Assert.Equal(26, model.EpisodesWatched);
+    }
+
+    [Fact]
+    public async Task CompletedStatus_DropsTheEpisodesWatchedFieldAndRestoresItOnLeaving()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        Assert.NotEmpty(cut.FindAll(".episode-picker__option"));
+
+        Status(cut, "Completed").Click();
+
+        // Label and all: Completed plus the Episodes field already state the count.
+        Assert.Empty(cut.FindAll(".episode-picker__option"));
+        Assert.DoesNotContain("Episodes watched", cut.Markup);
+
+        Status(cut, "Watching").Click();
+
+        Assert.NotEmpty(cut.FindAll(".episode-picker__option"));
+        Assert.Contains("Episodes watched", cut.Markup);
+    }
+
+    private static IElement Status(IRenderedComponent<AnimeEditorForm> cut, string label) =>
+        cut.FindAll(".status-picker__option")
+            .Single(button => button.TextContent.Contains(label, StringComparison.Ordinal));
+
+    // EpisodePicker reaches for BrowserStorageService to keep the selected option inside its
+    // scrolled track, so the form now needs the same JS plumbing the page tests use.
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton(sp => new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()));
+        return context;
     }
 
     private static AnimeEditorModel CreateModel() => new()
