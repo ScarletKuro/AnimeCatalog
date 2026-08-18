@@ -29,16 +29,40 @@
             </p>
         </div>
 
-        @if (CardHref is not null)
+        @* Dropped while the panel is open: it would sit behind an opaque overlay, still focusable,
+           handing keyboard users an invisible link that navigates away from the list they opened. *@
+        @if (CardHref is not null && !_expanded)
         {
             <NavLink href="@CardHref"
                      class="franchise-card__link"
                      aria-label="@($"Open {Summary.Title}")"></NavLink>
         }
+
+        @* The entry list expands INTO the cover rather than below it, so the card's height never
+           depends on how many entries a franchise has. Anything taller than the poster scrolls. *@
+        @if (_expanded)
+        {
+            <div id="@_panelId" class="franchise-card__panel">
+                <div class="franchise-card__panel-scroll scroll-thin">
+                    @if (Summary.VisibleEntries.Count == 0)
+                    {
+                        <p class="franchise-card__panel-empty">No entries match the current filters.</p>
+                    }
+                    else
+                    {
+                        <FranchiseEntryList Entries="Summary.VisibleEntries" />
+                    }
+                </div>
+            </div>
+        }
     </div>
 
+    @* aria-expanded is written as an explicit string because Blazor omits an attribute whose value
+       is the bool false, and a disclosure control must always expose it, collapsed or not. *@
     <button type="button" class="franchise-card__toggle"
-            aria-expanded="@_expanded" @onclick="ToggleExpanded">
+            aria-expanded="@(_expanded ? "true" : "false")"
+            aria-controls="@_panelId"
+            @onclick="ToggleExpanded">
         <span>@EntryCountLabel</span>
         <span class="franchise-card__chevron" aria-hidden="true">
             <svg viewBox="0 0 20 20" focusable="false">
@@ -46,16 +70,10 @@
             </svg>
         </span>
     </button>
-
-    @if (_expanded)
-    {
-        <div class="franchise-card__entries">
-            <FranchiseEntryList Entries="Summary.VisibleEntries" />
-        </div>
-    }
 </article>
 
 @code {
+    private readonly string _panelId = $"franchise-panel-{Guid.NewGuid():N}";
     private bool _expanded;
 
     [Parameter, EditorRequired]

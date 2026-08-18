@@ -192,6 +192,142 @@ public sealed class FranchiseCardTests
     }
 
     [Fact]
+    public void ExpandedPanel_OverlaysThePosterInsteadOfGrowingTheCard()
+    {
+        using var context = new BunitContext();
+        var cut = context.Render<FranchiseCard>(parameters => parameters.Add(p => p.Summary, FrierenFranchise()));
+
+        Assert.Empty(cut.FindAll(".franchise-card__panel"));
+
+        cut.Find("button").Click();
+
+        // Inside the poster and nowhere else. An absolutely positioned child of the 2:3 poster
+        // contributes no height, which is the entire point: seven entries must cost the same card
+        // height as one. The old sibling-of-the-toggle placement is what grew the card.
+        Assert.NotNull(cut.Find(".franchise-card__poster > .franchise-card__panel"));
+        Assert.Empty(cut.FindAll(".franchise-card > .franchise-card__panel"));
+        Assert.Empty(cut.FindAll(".franchise-card__entries"));
+
+        // The shared thin-scrollbar recipe, not a bespoke one.
+        Assert.Contains("scroll-thin", cut.Find(".franchise-card__panel-scroll").GetAttribute("class"));
+    }
+
+    [Fact]
+    public void ExpandedCard_DropsTheStretchedLink()
+    {
+        using var context = new BunitContext();
+        var cut = context.Render<FranchiseCard>(parameters => parameters.Add(p => p.Summary, new FranchiseSummaryViewModel
+        {
+            Title = "Fate",
+            Slug = "fate",
+            EntryCount = 1,
+            CompletedCount = 1,
+            Entries = [Frieren],
+            VisibleEntries = [Frieren]
+        }));
+
+        Assert.Equal("franchise/fate", cut.Find(".franchise-card__link").GetAttribute("href"));
+
+        cut.Find("button").Click();
+
+        // The panel covers the link completely. Left in the DOM it would be an invisible tab stop
+        // that navigates away from the list the user just opened.
+        Assert.Empty(cut.FindAll(".franchise-card__link"));
+    }
+
+    [Fact]
+    public void Toggle_IsStillTheOnlyButtonAndControlsThePanel()
+    {
+        using var context = new BunitContext();
+        var cut = context.Render<FranchiseCard>(parameters => parameters.Add(p => p.Summary, FrierenFranchise()));
+
+        // Blazor omits an attribute whose value is the bool false, so this has to be a string:
+        // a disclosure control must expose aria-expanded collapsed as well as open.
+        var button = Assert.Single(cut.FindAll("button"));
+        Assert.Equal("false", button.GetAttribute("aria-expanded"));
+
+        cut.Find("button").Click();
+
+        // Existing tests reach the toggle via Find("button"); the panel must never add another one.
+        Assert.Single(cut.FindAll("button"));
+        Assert.Equal("true", cut.Find(".franchise-card__toggle").GetAttribute("aria-expanded"));
+        Assert.Equal(button.GetAttribute("aria-controls"), cut.Find(".franchise-card__panel").GetAttribute("id"));
+    }
+
+    [Fact]
+    public void CompactRows_AreScopedSoAdminRelationListsAreUnaffected()
+    {
+        using var context = new BunitContext();
+        var cut = context.Render<FranchiseCard>(parameters => parameters.Add(p => p.Summary, FrierenFranchise()));
+        cut.Find("button").Click();
+
+        // Every compact rule hangs off this modifier. AnimeEditorForm and AddAnime reuse the bare
+        // __item/__title/__subline names inside .relation-list and must stay roomy.
+        Assert.NotNull(cut.Find(".franchise-entry-list--compact"));
+        Assert.NotNull(cut.Find(".franchise-entry-list--compact .franchise-entry-list__body"));
+    }
+
+    [Fact]
+    public void UnratedEntry_AbbreviatesTheScoreButStillSaysUnrated()
+    {
+        var unrated = new AnimeListItemViewModel
+        {
+            AnimeEntry = new AnimeEntry { Id = 7, TitleRomaji = "Fate/Apocrypha", Episodes = 25 },
+            CatalogEntry = new CatalogEntry { AnimeEntryId = 7, Status = CatalogStatus.Watching }
+        };
+
+        using var context = new BunitContext();
+        var cut = context.Render<FranchiseCard>(parameters => parameters.Add(p => p.Summary, new FranchiseSummaryViewModel
+        {
+            Title = "Fate",
+            EntryCount = 1,
+            CompletedCount = 0,
+            Entries = [unrated],
+            VisibleEntries = [unrated]
+        }));
+        cut.Find("button").Click();
+
+        // "Unrated" is twice the width of a score and would set the column width for every row, so
+        // the visible text is a dash and the word moves to the screen-reader copy.
+        var rating = cut.Find(".franchise-entry-list__item .rating-display");
+        Assert.Contains("–", rating.TextContent);
+        Assert.Equal("Unrated", cut.Find(".franchise-entry-list__item .rating-display .sr-only").TextContent);
+    }
+
+    [Fact]
+    public void Panel_WithNoVisibleEntries_ExplainsItselfInsteadOfCoveringTheArtWithNothing()
+    {
+        using var context = new BunitContext();
+        var cut = context.Render<FranchiseCard>(parameters => parameters.Add(p => p.Summary, new FranchiseSummaryViewModel
+        {
+            Title = "Fate",
+            EntryCount = 5,
+            CompletedCount = 3
+        }));
+
+        Assert.Equal("0 of 5 entries", ToggleLabel(cut));
+        cut.Find("button").Click();
+
+        Assert.Empty(cut.FindAll(".franchise-entry-list"));
+        Assert.Contains("No entries", cut.Find(".franchise-card__panel-empty").TextContent);
+    }
+
+    private static readonly AnimeListItemViewModel Frieren = new()
+    {
+        AnimeEntry = new AnimeEntry { Id = 1, TitleRomaji = "Sousou no Frieren", TitleEnglish = "Frieren: Beyond Journey's End", Episodes = 28 },
+        CatalogEntry = new CatalogEntry { AnimeEntryId = 1, Status = CatalogStatus.Completed, Score = 9.5m }
+    };
+
+    private static FranchiseSummaryViewModel FrierenFranchise() => new()
+    {
+        Title = "Frieren",
+        EntryCount = 1,
+        CompletedCount = 1,
+        Entries = [Frieren],
+        VisibleEntries = [Frieren]
+    };
+
+    [Fact]
     public void Progress_IsSpelledOutForScreenReaders()
     {
         using var context = new BunitContext();

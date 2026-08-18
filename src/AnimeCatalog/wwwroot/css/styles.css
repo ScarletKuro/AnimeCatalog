@@ -1180,6 +1180,40 @@
         color: var(--warning);
     }
 
+    /* Thin themed scrollbar, shared by the admin search results and the franchise card's overlay
+       panel. Only the chrome lives here: whether an element scrolls at all, and any edge fade, is
+       the host's business. Scrollbar properties on a non-scrolling element are inert, which is why
+       .search-results can carry them at every width even though it only scrolls at >=1280px. */
+    .scroll-thin,
+    .search-results {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(158, 240, 255, 0.28) transparent;
+    }
+
+    .scroll-thin::-webkit-scrollbar,
+    .search-results::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .scroll-thin::-webkit-scrollbar-track,
+    .search-results::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scroll-thin::-webkit-scrollbar-thumb,
+    .search-results::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        border: 2px solid transparent;
+        background: rgba(158, 240, 255, 0.28);
+        background-clip: content-box;
+    }
+
+    .scroll-thin::-webkit-scrollbar-thumb:hover,
+    .search-results::-webkit-scrollbar-thumb:hover {
+        background: rgba(158, 240, 255, 0.45);
+        background-clip: content-box;
+    }
+
     .franchise-grid {
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     }
@@ -1480,9 +1514,58 @@
         background: rgba(158, 240, 255, 0.08);
     }
 
-    .franchise-card__entries {
-        @apply px-4 pb-4 pt-3;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
+    /* The overlay panel. Absolutely positioned inside the 2:3 poster, so however many entries a
+       franchise has, the card is exactly as tall as poster + toggle. Expanding used to append a row
+       below the toggle, which turned a seven-entry franchise into a 900px tower and wrecked the
+       grid's rhythm. z-3 clears the corner chips (z-1) and the stretched link (z-2). */
+    .franchise-card__panel {
+        @apply absolute z-[3] grid overflow-hidden;
+        inset: 0;
+        grid-template-rows: minmax(0, 1fr);
+        background: linear-gradient(180deg, rgba(9, 15, 26, 0.94), rgba(6, 11, 20, 0.97));
+        backdrop-filter: blur(12px) saturate(120%);
+        animation: franchise-panel-in 160ms ease-out;
+    }
+
+    /* A separate element from the panel so the fade mask clips the list, not the panel's own
+       background: masking the background would thin the bottom edge straight back into un-dimmed
+       cover art. min-h-0 is what lets the grid row actually cap this box. */
+    .franchise-card__panel-scroll {
+        @apply min-h-0 overflow-y-auto px-2 py-1.5;
+        overscroll-behavior: contain;
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 0.75rem), transparent 100%);
+        mask-image: linear-gradient(to bottom, #000 calc(100% - 0.75rem), transparent 100%);
+    }
+
+    /* h-full, not self-center: this sits inside the scroll box (a block container, where
+       align-self does nothing), and the scroll box has a definite height from the panel grid row. */
+    .franchise-card__panel-empty {
+        @apply m-0 grid h-full place-items-center px-2 text-center text-[0.75rem];
+        color: var(--text-soft);
+    }
+
+    /* The panel is near-opaque, so this is mostly belt-and-braces against a browser that ignores
+       backdrop-filter. Opacity rather than display:none: the franchise title stays in the
+       accessibility tree, and while expanded there is nowhere else it appears. */
+    .franchise-card--expanded .franchise-card__overlay,
+    .franchise-card--expanded .franchise-card__rating,
+    .franchise-card--expanded .franchise-card__live {
+        opacity: 0;
+        transition: opacity 140ms ease;
+    }
+
+    /* An expanded card stops behaving like a hover target: the panel is the feedback now, and
+       holding the card still keeps a grid of open panels from jittering under the pointer. It also
+       sidesteps the mid-transition raster seam the .franchise-card__poster comment describes, since
+       that only appears while the card is lifting. Equal specificity to the base :hover rules, so
+       these must stay after them in source order. */
+    .franchise-card--expanded:hover,
+    .franchise-card--expanded:focus-within {
+        transform: none;
+    }
+
+    .franchise-card--expanded:hover .franchise-card__poster img {
+        transform: none;
     }
 
     .live-indicator {
@@ -1509,6 +1592,80 @@
 
     .franchise-entry-list__subline {
         @apply mt-2 flex flex-wrap gap-2;
+    }
+
+    /* Every rule below is scoped to the modifier. .franchise-entry-list__item, __title and __subline
+       are also the relation-list rows in AnimeEditorForm and AddAnime, which must stay roomy; the
+       modifier only ever lands on FranchiseEntryList's own ul. Target row pitch is ~46px against the
+       ~100px the roomy rows cost, which is what makes a seven-entry list fit a 330px poster. */
+    .franchise-entry-list--compact {
+        @apply gap-0;
+    }
+
+    .franchise-entry-list--compact .franchise-entry-list__item {
+        @apply gap-2 py-1.5;
+        border-top-color: rgba(255, 255, 255, 0.07);
+    }
+
+    /* The base rule zeroes the first row's top padding to sit flush under a section heading. Inside
+       a scroll pane there is no heading, and an unpadded first row reads as clipped. */
+    .franchise-entry-list--compact .franchise-entry-list__item:first-child {
+        @apply pt-1.5;
+    }
+
+    /* min-w-0 is load-bearing: without it the flex item refuses to shrink below its content's
+       intrinsic width, so a long title pushes the score out of the card instead of truncating. */
+    .franchise-entry-list--compact .franchise-entry-list__body {
+        @apply grid min-w-0 gap-1;
+    }
+
+    .franchise-entry-list--compact .franchise-entry-list__title {
+        @apply block truncate text-[0.8rem] leading-tight;
+    }
+
+    /* The stretched card link is not rendered while the panel is open, so these are the first
+       focusable things inside it and need their own ring. */
+    .franchise-entry-list--compact .franchise-entry-list__title:focus-visible {
+        @apply rounded-[6px];
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+    }
+
+    /* nowrap, not wrap: a wrapped subline would make rows different heights and break the rhythm.
+       The title truncates long before this row runs out of width. */
+    .franchise-entry-list--compact .franchise-entry-list__subline {
+        @apply mt-0 flex-nowrap items-center gap-1.5 text-[0.68rem] leading-none;
+        color: var(--text-soft);
+    }
+
+    /* Pill -> dot. The status colour comes from .status-badge--* as currentColor, so all five
+       statuses keep their existing hues without restating a single one of them here. A full pill
+       costs ~60px of a 150px-wide card; the dot plus its label costs the label alone. */
+    .franchise-entry-list--compact .status-badge {
+        @apply shrink-0 gap-1 rounded-none bg-transparent px-0 py-0 text-[0.66rem] font-semibold leading-none;
+    }
+
+    .franchise-entry-list--compact .status-badge::before {
+        content: "";
+        @apply h-[0.45em] w-[0.45em] shrink-0 rounded-full;
+        background: currentColor;
+    }
+
+    .franchise-entry-list--compact .progress-display {
+        @apply shrink-0 gap-1 font-medium;
+        color: var(--text-soft);
+    }
+
+    /* Middot separator, so the dot-plus-label and the episode count do not read as one phrase. */
+    .franchise-entry-list--compact .progress-display::before {
+        content: "\00b7";
+        color: rgba(143, 166, 189, 0.55);
+    }
+
+    /* tabular-nums so the score column does not shimmy between 9.5 and 10.0 down the list. */
+    .franchise-entry-list--compact .rating-display {
+        @apply shrink-0 gap-1 self-center text-[0.72rem] font-semibold;
+        font-variant-numeric: tabular-nums;
     }
 
     .details-hero {
@@ -2721,6 +2878,13 @@
     }
 }
 
+@keyframes franchise-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+}
+
 @keyframes nav-drawer-in {
     from {
         opacity: 0;
@@ -2912,6 +3076,21 @@
         @apply px-3 py-2 text-[0.75rem];
     }
 
+    /* Expanded, a 150px column cannot hold a readable list, so the card claims the whole grid row
+       and the poster relaxes from portrait to landscape. The art behind is blurred out anyway, and
+       the panel still never leaves the card. */
+    .franchise-card--expanded {
+        grid-column: 1 / -1;
+    }
+
+    .franchise-card--expanded .franchise-card__poster {
+        aspect-ratio: 4 / 3;
+    }
+
+    .franchise-card__panel-scroll {
+        @apply px-1.5 py-1;
+    }
+
     /* One column below the breakpoint: the poster sits above the text and is capped so it
        cannot dominate a narrow viewport. */
     .home-spotlight {
@@ -3050,6 +3229,18 @@
         transform: none;
     }
 
+    /* The panel appears without sliding. Unlike the chevron rotation, this animation carries no
+       state: the panel's presence is the state. */
+    .franchise-card__panel {
+        animation: none;
+    }
+
+    .franchise-card--expanded .franchise-card__overlay,
+    .franchise-card--expanded .franchise-card__rating,
+    .franchise-card--expanded .franchise-card__live {
+        transition: none;
+    }
+
     .stat-meter__fill {
         transition: none;
     }
@@ -3093,33 +3284,13 @@
         grid-template-rows: auto auto minmax(0, 1fr);
     }
 
+    /* Scrollbar chrome lives on the shared .scroll-thin rule in the components layer; only the
+       decision to scroll at all is breakpoint-scoped. */
     .search-results {
         min-height: 0;
         overflow-y: auto;
         overscroll-behavior: contain;
-        scrollbar-width: thin;
-        scrollbar-color: rgba(158, 240, 255, 0.28) transparent;
         -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1rem), transparent 100%);
         mask-image: linear-gradient(to bottom, #000 calc(100% - 1rem), transparent 100%);
-    }
-
-    .search-results::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    .search-results::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .search-results::-webkit-scrollbar-thumb {
-        border-radius: 999px;
-        border: 2px solid transparent;
-        background: rgba(158, 240, 255, 0.28);
-        background-clip: content-box;
-    }
-
-    .search-results::-webkit-scrollbar-thumb:hover {
-        background: rgba(158, 240, 255, 0.45);
-        background-clip: content-box;
     }
 }

@@ -1,9 +1,25 @@
 <span class="rating-display">
     <span class="rating-display__icon"><StarIcon /></span>
-    <span>@(Score is null ? "Unrated" : Score.Value.ToString("0.0"))</span>
+    <span aria-hidden="@(IsAbbreviated ? "true" : null)">@(Score is null ? UnratedLabel : Score.Value.ToString("0.0"))</span>
+    @if (IsAbbreviated)
+    {
+        <span class="sr-only">Unrated</span>
+    }
 </span>
 
 @code {
     [Parameter]
     public decimal? Score { get; set; }
+
+    /// <summary>
+    /// Visible stand-in for a missing score. Hosts with a narrow score column pass a dash: "Unrated"
+    /// is more than twice the width of a score and would set the column width for every row. The
+    /// spoken form stays "Unrated" via an sr-only span, so the dash is never read as the meaning.
+    /// </summary>
+    [Parameter]
+    public string UnratedLabel { get; set; } = "Unrated";
+
+    // Defaulted callers render byte-identical markup to before: aria-hidden is null so Blazor omits
+    // the attribute, and the sr-only span is not emitted at all.
+    private bool IsAbbreviated => Score is null && UnratedLabel != "Unrated";
 }

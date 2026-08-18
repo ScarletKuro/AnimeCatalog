@@ -1,15 +1,21 @@
-<ul class="franchise-entry-list">
+@* Only ever rendered inside FranchiseCard's overlay panel, so the compact modifier and the short
+   unrated label are hardcoded rather than parameterised. The item/title/subline class names are
+   shared with the roomy relation-list rows in AnimeEditorForm and AddAnime, which is exactly why
+   every compact rule hangs off --compact instead of restyling those names globally. *@
+<ul class="franchise-entry-list franchise-entry-list--compact">
     @foreach (var entry in Entries)
     {
         <li class="franchise-entry-list__item">
-            <div>
-                <NavLink href="@($"anime/{entry.AnimeEntry.Id}")" class="franchise-entry-list__title">@entry.PrimaryTitle</NavLink>
+            <div class="franchise-entry-list__body">
+                <NavLink href="@($"anime/{entry.AnimeEntry.Id}")"
+                         class="franchise-entry-list__title"
+                         title="@entry.PrimaryTitle">@entry.PrimaryTitle</NavLink>
                 <div class="franchise-entry-list__subline">
                     <StatusBadge Status="entry.CatalogEntry.Status" />
                     <ProgressDisplay EpisodesWatched="entry.CatalogEntry.EpisodesWatched" TotalEpisodes="entry.AnimeEntry.Episodes" />
                 </div>
             </div>
-            <RatingDisplay Score="entry.CatalogEntry.Score" />
+            <RatingDisplay Score="entry.CatalogEntry.Score" UnratedLabel="–" />
         </li>
     }
 </ul>
