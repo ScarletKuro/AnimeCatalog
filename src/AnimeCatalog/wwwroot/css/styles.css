@@ -19,6 +19,9 @@
         --success: #89f7c6;
         --danger: #ff9eaa;
         --warning: #f3cf85;
+        /* Referenced by the [data-scroll-target] scroll-margin below. The mobile breakpoint
+           redefines it, because the header collapses to a single row there. */
+        --sticky-header-height: 4.5rem;
         --shadow: 0 28px 80px rgba(2, 8, 18, 0.42);
         --shadow-soft: 0 18px 44px rgba(2, 8, 18, 0.25);
         --radius-xl: 30px;
@@ -153,6 +156,144 @@
         @apply text-[0.98rem] font-bold tracking-[0.06em];
         color: var(--text-strong);
         text-transform: none;
+    }
+
+    /* Mobile header. Above 960px .site-nav and .site-actions carry navigation and identity, so
+       this control is hidden; below it they are hidden and this is the only way into either. */
+    .nav-toggle {
+        @apply hidden cursor-pointer items-center gap-1 rounded-full border p-1.5;
+        min-height: 2.75rem;
+        appearance: none;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: var(--shadow-soft);
+        transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .nav-toggle[aria-expanded="true"] {
+        border-color: rgba(158, 240, 255, 0.22);
+        background: linear-gradient(180deg, rgba(158, 240, 255, 0.09), rgba(255, 255, 255, 0.04));
+    }
+
+    .nav-toggle__avatar {
+        @apply grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-extrabold;
+        color: #07111c;
+        background:
+            radial-gradient(circle at 28% 25%, rgba(255, 255, 255, 0.88), transparent 24%),
+            linear-gradient(135deg, #9ef0ff 0%, #72d7ff 45%, #f5e598 100%);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    /* Three bars rather than an SVG so the open state can animate them into an X. A centred flex
+       column, not a grid: fixed grid rows pack to the top of the box, which left the bars riding
+       high against the avatar beside them. */
+    .nav-toggle__burger {
+        @apply flex h-8 w-8 shrink-0 flex-col items-center justify-center gap-[0.375rem];
+        color: var(--text-soft);
+    }
+
+    .nav-toggle[aria-expanded="true"] .nav-toggle__burger {
+        color: var(--text-strong);
+    }
+
+    .nav-toggle__burger span {
+        @apply block h-[2px] w-[1.15rem] shrink-0 rounded-full;
+        background: currentColor;
+        transition: transform 160ms ease, opacity 120ms ease;
+    }
+
+    /* translate before rotate: each bar first travels to the shared centre row, then turns. */
+    .nav-toggle[aria-expanded="true"] .nav-toggle__burger span:first-child {
+        transform: translateY(0.5rem) rotate(45deg);
+    }
+
+    .nav-toggle[aria-expanded="true"] .nav-toggle__burger span:nth-child(2) {
+        opacity: 0;
+    }
+
+    .nav-toggle[aria-expanded="true"] .nav-toggle__burger span:last-child {
+        transform: translateY(-0.5rem) rotate(-45deg);
+    }
+
+    /* Anchored to the header rather than the viewport so it stays glued to the bar it belongs to
+       while the page scrolls behind the backdrop. */
+    .nav-drawer {
+        @apply absolute inset-x-0 top-full grid gap-2 border-b p-3;
+        background:
+            radial-gradient(circle at top right, rgba(158, 240, 255, 0.12), transparent 24%),
+            linear-gradient(180deg, rgba(17, 26, 44, 0.98), rgba(9, 16, 29, 0.98));
+        border-color: rgba(158, 240, 255, 0.14);
+        box-shadow: 0 28px 60px rgba(2, 8, 18, 0.42);
+        backdrop-filter: blur(18px);
+        max-height: calc(100svh - 3.5rem);
+        overflow-y: auto;
+        animation: nav-drawer-in 160ms ease-out;
+    }
+
+    /* Sits below .site-header (z-10) but above page content, which sets no z-index at all. */
+    .nav-drawer__backdrop {
+        @apply fixed inset-0;
+        z-index: 9;
+        background: rgba(2, 8, 18, 0.55);
+        backdrop-filter: blur(2px);
+    }
+
+    .nav-drawer__head {
+        @apply flex items-center gap-3 rounded-[var(--radius-md)] border border-white/6 bg-white/4 p-3;
+    }
+
+    .nav-drawer__nav {
+        @apply grid gap-1;
+    }
+
+    .nav-drawer__link {
+        @apply flex w-full cursor-pointer items-center rounded-[var(--radius-md)] border border-transparent px-4 text-left text-sm font-semibold transition duration-150 ease-in-out;
+        min-height: 2.75rem;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .nav-drawer .active,
+    .nav-drawer__link:hover {
+        color: var(--text-strong);
+        background: rgba(158, 240, 255, 0.08);
+        border-color: rgba(158, 240, 255, 0.18);
+    }
+
+    /* Same accent as .site-nav__link--action, and the same specificity problem: both selectors
+       have to outrank .nav-drawer .active and .nav-drawer__link:hover. */
+    .nav-drawer__link--action {
+        @apply text-slate-950;
+        background: linear-gradient(135deg, #9ef0ff, #f5e598);
+        border-color: transparent;
+    }
+
+    .nav-drawer .nav-drawer__link--action.active,
+    .nav-drawer__link--action:hover {
+        @apply text-slate-950;
+        background: linear-gradient(135deg, #b4f4ff, #fbefb0);
+        border-color: rgba(158, 240, 255, 0.35);
+    }
+
+    .nav-drawer__link--danger {
+        color: var(--danger);
+    }
+
+    .nav-drawer__link--danger:hover {
+        color: var(--danger);
+        border-color: rgba(255, 158, 170, 0.18);
+        background: rgba(255, 158, 170, 0.1);
+    }
+
+    .nav-drawer__footer {
+        @apply grid gap-2 border-t pt-2;
+        border-color: var(--panel-border);
+    }
+
+    .nav-toggle:focus-visible,
+    .nav-drawer__link:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 3px;
     }
 
     .site-nav {
@@ -2580,6 +2721,13 @@
     }
 }
 
+@keyframes nav-drawer-in {
+    from {
+        opacity: 0;
+        transform: translateY(-0.5rem);
+    }
+}
+
 @keyframes loading-rail {
     0% {
         transform: translateX(-100%);
@@ -2682,33 +2830,35 @@
 }
 
 @media (max-width: 960px) {
+    /* The header collapses to a single row here and everything it used to show sits in
+       .nav-drawer instead, so scroll targets reserve less. */
+    :root {
+        --sticky-header-height: 3.5rem;
+    }
+
     .site-header__inner {
-        @apply flex-col items-start py-4;
+        @apply py-2;
+        min-height: 3.5rem;
     }
 
+    /* Both are replaced by the drawer behind .nav-toggle below this breakpoint. */
+    .site-nav,
     .site-actions {
-        @apply justify-start;
+        @apply hidden;
     }
 
-    .site-nav {
-        @apply order-3 w-full justify-start overflow-x-auto;
+    .nav-toggle {
+        @apply flex;
     }
 
-    .site-actions {
-        @apply w-full;
+    /* The only flexible item left in the row, so it yields to the toggle rather than
+       pushing it off-screen on a 320px viewport. */
+    .site-brand {
+        @apply min-w-0 shrink;
     }
 
-    .profile-menu {
-        width: 100%;
-    }
-
-    .profile-menu__trigger,
-    .profile-menu__panel {
-        @apply w-full;
-    }
-
-    .profile-menu__panel {
-        @apply relative right-auto mt-2 min-w-0;
+    .site-brand__title {
+        @apply truncate;
     }
 
     .details-hero,
@@ -2739,10 +2889,10 @@
         padding-block: 2rem;
     }
 
-    /* The header stacks into three rows below this breakpoint, so it eats far more of the
-       viewport than the 4.5rem the desktop calc assumes. */
+    /* The header collapses to one 3.5rem row below this breakpoint, so the desktop calc's
+       4.5rem is the only term that changes: 3.5 + 2 (pt-8) + 4 (pb-16). */
     .notfound-stage {
-        min-height: calc(100svh - 17rem);
+        min-height: calc(100svh - 9.5rem);
     }
 
     .franchise-grid {
@@ -2871,6 +3021,16 @@
 /* The stylesheet had no reduced-motion handling at all. This covers the new components and
    the existing ones. Chevron rotation is kept: it encodes expanded state, it is not decoration. */
 @media (prefers-reduced-motion: reduce) {
+    /* The drawer appears without sliding. The burger-to-X transform is kept for the same reason
+       as the chevron rotation: it encodes expanded state, it is not decoration. */
+    .nav-drawer {
+        animation: none;
+    }
+
+    .nav-toggle__burger span {
+        transition: none;
+    }
+
     .franchise-card:hover,
     .franchise-card:focus-within,
     .poster-card:hover,

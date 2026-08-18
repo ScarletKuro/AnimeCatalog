@@ -95,3 +95,9 @@ export function scrollSelectedOptionIntoView(container) {
 
     container.scrollTop += (selectedBox.top - containerBox.top) - (containerBox.height - selectedBox.height) / 2;
 }
+
+// The nav drawer covers the viewport with a backdrop, but a touch drag on that backdrop still
+// scrolls the document underneath it. Locking the body keeps the page where the user left it.
+export function setBodyScrollLock(locked) {
+    document.body.style.overflow = locked ? "hidden" : "";
+}

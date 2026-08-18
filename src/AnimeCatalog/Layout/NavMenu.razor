@@ -1,4 +1,5 @@
 @inject AuthService AuthService
+@inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 @implements IAsyncDisposable
@@ -34,7 +35,7 @@
                     <button
                         type="button"
                         class="profile-menu__trigger"
-                        aria-expanded="@_isProfileMenuOpen"
+                        aria-expanded="@(_isProfileMenuOpen ? "true" : "false")"
                         aria-haspopup="menu"
                         @onclick="ToggleProfileMenuAsync">
                         <span class="profile-menu__avatar" aria-hidden="true">
@@ -74,7 +75,7 @@
                                 </span>
                                 <div class="profile-menu__meta">
                                     <strong>@DisplayName</strong>
-                                    <span>@(AuthService.IsAdmin ? "Project admin" : "Authenticated user")</span>
+                                    <span>@(AuthService.IsAdmin ? "Admin access" : "Signed in")</span>
                                 </div>
                             </div>
 
@@ -109,30 +110,129 @@
                 <NavLink href="login" class="button button--primary">Owner sign in</NavLink>
             }
         </div>
+
+        @* Below 960px .site-nav and .site-actions are hidden and this single control replaces both,
+           so the header never needs a second row. aria-expanded is an explicit string because
+           Blazor omits an attribute whose value is the bool false. *@
+        <button
+            type="button"
+            class="nav-toggle"
+            aria-controls="nav-drawer"
+            aria-expanded="@(_isDrawerOpen ? "true" : "false")"
+            aria-label="@(_isDrawerOpen ? "Close menu" : "Open menu")"
+            @onclick="ToggleDrawerAsync"
+            @onkeydown="HandleDrawerKeyDownAsync">
+            @if (AuthService.IsConfigured && AuthService.IsAuthenticated)
+            {
+                <span class="nav-toggle__avatar" aria-hidden="true">
+                    @if (HasAvatar)
+                    {
+                        <img class="profile-menu__avatar-image" src="@AvatarUrl" alt="" />
+                    }
+                    else
+                    {
+                        @UserInitials
+                    }
+                </span>
+            }
+            <span class="nav-toggle__burger" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+            </span>
+        </button>
+
+        @* Rendered only while open so the closed header emits exactly one copy of every nav link -
+           a permanently-rendered drawer would give /admin/add two .active anchors. *@
+        @if (_isDrawerOpen)
+        {
+            <div class="nav-drawer" id="nav-drawer" @onkeydown="HandleDrawerKeyDownAsync">
+                @if (AuthService.IsConfigured && AuthService.IsAuthenticated)
+                {
+                    <div class="nav-drawer__head">
+                        <span class="profile-menu__avatar profile-menu__avatar--large" aria-hidden="true">
+                            @if (HasAvatar)
+                            {
+                                <img class="profile-menu__avatar-image" src="@AvatarUrl" alt="" />
+                            }
+                            else
+                            {
+                                @UserInitials
+                            }
+                        </span>
+                        <div class="profile-menu__meta">
+                            <strong>@DisplayName</strong>
+                            <span>@(AuthService.IsAdmin ? "Admin access" : "Signed in")</span>
+                        </div>
+                    </div>
+                }
+
+                <nav class="nav-drawer__nav">
+                    <NavLink href="" Match="NavLinkMatch.All" class="nav-drawer__link">Home</NavLink>
+                    <NavLink href="catalog" class="nav-drawer__link">Catalog</NavLink>
+                    @if (AuthService.IsAdmin)
+                    {
+                        <NavLink href="watch-next" class="nav-drawer__link">Watch next</NavLink>
+                        @* Same reason as .site-nav: prefix matching would claim /admin/add too. *@
+                        <NavLink href="admin" Match="NavLinkMatch.All" class="nav-drawer__link">Admin</NavLink>
+                        <NavLink href="admin/add" class="nav-drawer__link nav-drawer__link--action">+ Add</NavLink>
+                    }
+                </nav>
+
+                <div class="nav-drawer__footer">
+                    @if (!AuthService.IsConfigured)
+                    {
+                        <span class="site-chip site-chip--muted">Supabase not configured</span>
+                    }
+                    else if (AuthService.IsAuthenticated)
+                    {
+                        <button type="button" class="nav-drawer__link nav-drawer__link--danger" @onclick="LogoutAsync">Sign out</button>
+                    }
+                    else
+                    {
+                        <NavLink href="login" class="button button--primary">Owner sign in</NavLink>
+                    }
+                </div>
+            </div>
+        }
     </div>
 </header>
+
+@* Outside the header on purpose: .site-header sets backdrop-filter, which makes it the containing
+   block for fixed-position descendants, so a nested inset-0 backdrop would be clipped to the header. *@
+@if (_isDrawerOpen)
+{
+    <div class="nav-drawer__backdrop" aria-hidden="true" @onclick="CloseDrawerAsync"></div>
+}
 
 @code {
     private ElementReference _profileMenuElement;
     private IJSObjectReference? _browserModule;
     private int _outsideClickRegistrationId;
     private bool _isProfileMenuOpen;
+    private bool _isDrawerOpen;
     private bool _outsideClickSyncPending;
+    private bool _scrollLockSyncPending;
 
     protected override void OnInitialized()
     {
         AuthService.StateChanged += HandleStateChanged;
+        NavigationManager.LocationChanged += HandleLocationChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_outsideClickSyncPending)
+        if (_outsideClickSyncPending)
         {
-            return;
+            _outsideClickSyncPending = false;
+            await SyncOutsideClickHandlerAsync();
         }
 
-        _outsideClickSyncPending = false;
-        await SyncOutsideClickHandlerAsync();
+        if (_scrollLockSyncPending)
+        {
+            _scrollLockSyncPending = false;
+            await SyncScrollLockAsync();
+        }
     }
 
     private async Task ToggleProfileMenuAsync()
@@ -142,10 +242,47 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    private async Task ToggleDrawerAsync()
+    {
+        await SetDrawerOpenAsync(!_isDrawerOpen);
+    }
+
+    private async Task CloseDrawerAsync()
+    {
+        await SetDrawerOpenAsync(false);
+    }
+
+    private async Task HandleDrawerKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key is "Escape" or "Esc")
+        {
+            await CloseDrawerAsync();
+        }
+    }
+
+    private async Task SetDrawerOpenAsync(bool isOpen)
+    {
+        if (_isDrawerOpen == isOpen)
+        {
+            return;
+        }
+
+        _isDrawerOpen = isOpen;
+        _scrollLockSyncPending = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task LogoutAsync()
     {
         _isProfileMenuOpen = false;
         _outsideClickSyncPending = true;
+
+        if (_isDrawerOpen)
+        {
+            _isDrawerOpen = false;
+            _scrollLockSyncPending = true;
+        }
+
         await AuthService.LogoutAsync();
     }
 
@@ -207,16 +344,44 @@
         }
     }
 
+    private async Task SyncScrollLockAsync()
+    {
+        _browserModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/auth.js");
+        await _browserModule.InvokeVoidAsync("setBodyScrollLock", _isDrawerOpen);
+    }
+
+    // Covers every drawer link, including a tap on the route already showing, which NavLink
+    // reports as a location change even though the URL does not move.
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (!_isDrawerOpen)
+        {
+            return;
+        }
+
+        _isDrawerOpen = false;
+        _scrollLockSyncPending = true;
+        InvokeAsync(StateHasChanged);
+    }
+
     private void HandleStateChanged()
     {
         _isProfileMenuOpen = false;
         _outsideClickSyncPending = true;
+
+        if (_isDrawerOpen)
+        {
+            _isDrawerOpen = false;
+            _scrollLockSyncPending = true;
+        }
+
         InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
     {
         AuthService.StateChanged -= HandleStateChanged;
+        NavigationManager.LocationChanged -= HandleLocationChanged;
     }
 
     public async ValueTask DisposeAsync()
@@ -226,6 +391,12 @@
             if (_outsideClickRegistrationId != 0)
             {
                 await _browserModule.InvokeVoidAsync("unregisterOutsideClick", _outsideClickRegistrationId);
+            }
+
+            // A lock left behind would freeze scrolling on whatever renders next.
+            if (_isDrawerOpen)
+            {
+                await _browserModule.InvokeVoidAsync("setBodyScrollLock", false);
             }
 
             await _browserModule.DisposeAsync();

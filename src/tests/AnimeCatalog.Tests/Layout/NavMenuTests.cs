@@ -62,6 +62,97 @@ public sealed class NavMenuTests
         });
     }
 
+    [Fact]
+    public void Drawer_StartsClosedAndExposesItsCollapsedState()
+    {
+        using var context = CreateContext(isAdmin: false, out _);
+
+        var cut = context.Render<NavMenu>();
+
+        // Blazor omits an attribute whose value is the bool false, so the component has to write
+        // aria-expanded as an explicit string or the collapsed state is never announced.
+        Assert.Equal("false", cut.Find("button.nav-toggle").GetAttribute("aria-expanded"));
+        Assert.Empty(cut.FindAll(".nav-drawer"));
+        Assert.Empty(cut.FindAll(".nav-drawer__backdrop"));
+    }
+
+    [Fact]
+    public void TappingTheToggle_OpensTheDrawerWithThePublicLinks()
+    {
+        using var context = CreateContext(isAdmin: false, out _);
+
+        var cut = context.Render<NavMenu>();
+        cut.Find("button.nav-toggle").Click();
+
+        var links = cut.FindAll(".nav-drawer__nav a");
+        Assert.Collection(
+            links,
+            home => Assert.Equal("Home", home.TextContent),
+            catalog => Assert.Equal("Catalog", catalog.TextContent));
+        Assert.Equal("true", cut.Find("button.nav-toggle").GetAttribute("aria-expanded"));
+    }
+
+    [Fact]
+    public async Task Admin_GetsEveryAdminLinkInTheDrawer()
+    {
+        using var context = CreateContext(isAdmin: true, out var authService);
+
+        var cut = context.Render<NavMenu>();
+        await authService.InitializeAsync();
+
+        cut.WaitForAssertion(() => Assert.True(authService.IsAdmin));
+        cut.Find("button.nav-toggle").Click();
+
+        var links = cut.FindAll(".nav-drawer__nav a");
+        Assert.Equal(
+            new[] { "Home", "Catalog", "Watch next", "Admin", "+ Add" },
+            links.Select(link => link.TextContent).ToArray());
+
+        var addLink = cut.Find("a.nav-drawer__link--action");
+        Assert.EndsWith("admin/add", addLink.GetAttribute("href"));
+    }
+
+    [Fact]
+    public void AnonymousVisitor_GetsNoAdminShortcutEvenWithTheDrawerOpen()
+    {
+        using var context = CreateContext(isAdmin: false, out _);
+
+        var cut = context.Render<NavMenu>();
+        cut.Find("button.nav-toggle").Click();
+
+        // Same invariant as the closed header: a hidden panel still ships its markup to the client.
+        Assert.DoesNotContain("admin/add", cut.Markup);
+        Assert.DoesNotContain("+ Add", cut.Markup);
+        Assert.EndsWith("login", cut.Find(".nav-drawer__footer a").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void TappingTheBackdrop_ClosesTheDrawer()
+    {
+        using var context = CreateContext(isAdmin: false, out _);
+
+        var cut = context.Render<NavMenu>();
+        cut.Find("button.nav-toggle").Click();
+        cut.Find(".nav-drawer__backdrop").Click();
+
+        Assert.Empty(cut.FindAll(".nav-drawer"));
+        Assert.Equal("false", cut.Find("button.nav-toggle").GetAttribute("aria-expanded"));
+    }
+
+    [Fact]
+    public void NavigatingAway_ClosesTheDrawer()
+    {
+        using var context = CreateContext(isAdmin: false, out _);
+
+        var cut = context.Render<NavMenu>();
+        cut.Find("button.nav-toggle").Click();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("catalog");
+
+        // Covers a tap on the route already showing too: NavLink reports that as a location
+        // change even though the URL does not move.
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".nav-drawer")));
+    }
+
     private static BunitContext CreateContext(bool isAdmin, out AuthService authService)
     {
         var context = new BunitContext();
