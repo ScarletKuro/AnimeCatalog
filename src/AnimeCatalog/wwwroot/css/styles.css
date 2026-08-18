@@ -344,6 +344,7 @@
     .loading-card,
     .empty-card,
     .stat-card,
+    .notfound-card,
     .access-card,
     .home-spotlight,
     .details-hero,
@@ -1910,6 +1911,77 @@
             linear-gradient(180deg, rgba(15, 24, 40, 0.95), rgba(10, 18, 31, 0.9));
     }
 
+    /* Vertically centre the card in the viewport instead of parking it under the header. The
+       chrome to subtract is the 4.5rem sticky header plus .main-content's 2rem/4rem padding -
+       the same arithmetic as --rail-sticky-top. svh so mobile browser bars do not overshoot. */
+    .notfound-stage {
+        @apply content-center;
+        min-height: calc(100vh - 10.5rem);
+        min-height: calc(100svh - 10.5rem);
+    }
+
+    /* 404 route. Centered and sized to its content on purpose: .hero-card is a wide,
+       left-aligned page banner with a 19rem min-height, which left this short message
+       stranded in its top-left corner with the decorative glow alone in the opposite one. */
+    .notfound-card {
+        @apply mx-auto grid max-w-[34rem] justify-items-center gap-3 overflow-hidden text-center;
+        position: relative;
+        /* The glow below sits at z-index -1, and isolation guarantees the stacking context it
+           needs regardless of whether the shared backdrop-filter is supported. */
+        isolation: isolate;
+        padding-block: 2.75rem;
+        padding-inline: 1.5rem;
+        border-color: rgba(158, 240, 255, 0.16);
+        background:
+            radial-gradient(circle at top, rgba(158, 240, 255, 0.12), transparent 42%),
+            linear-gradient(180deg, rgba(15, 24, 40, 0.96), rgba(10, 18, 31, 0.92));
+    }
+
+    /* Glow behind the numeral. Reuses the loading-glow keyframes defined for the boot mascot
+       so there is only one such pulse in the stylesheet. */
+    .notfound-card::before {
+        content: "";
+        position: absolute;
+        top: 0.75rem;
+        left: 50%;
+        z-index: -1;
+        width: 18rem;
+        height: 18rem;
+        transform: translateX(-50%);
+        border-radius: 9999px;
+        background: radial-gradient(circle, rgba(158, 240, 255, 0.22), transparent 68%);
+        filter: blur(10px);
+        pointer-events: none;
+        animation: loading-glow 3.6s ease-in-out infinite;
+    }
+
+    /* Decorative and aria-hidden in the markup - the "Lost route" eyebrow carries the meaning
+       for assistive tech, so the numeral is free to be pure ornament. */
+    .notfound-card__glyph {
+        @apply font-extrabold leading-none;
+        font-size: clamp(4.5rem, 18vw, 7.5rem);
+        letter-spacing: 0.06em;
+        background: linear-gradient(135deg, #9ef0ff, #f5e598);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        filter: drop-shadow(0 14px 28px rgba(89, 208, 239, 0.26));
+    }
+
+    /* .eyebrow ships an mb-2 for stacked headers; here the grid gap already spaces it. */
+    .notfound-card .eyebrow {
+        @apply mb-0;
+    }
+
+    .notfound-card__body {
+        @apply max-w-[28rem] leading-7;
+        color: var(--text-soft);
+    }
+
+    .notfound-card .button-row {
+        @apply mt-2 justify-center;
+    }
+
     /* Refused-access state. Deliberately not an .error-card: nothing failed, the catalog is
        simply locked, so it reads as an invitation to sign in rather than as a fault. */
     .access-card {
@@ -2437,7 +2509,8 @@
         @apply text-3xl font-extrabold md:text-4xl;
     }
 
-    .hero-card h1 {
+    .hero-card h1,
+    .notfound-card h1 {
         @apply text-4xl font-extrabold md:text-5xl;
     }
 
@@ -2603,6 +2676,18 @@
         @apply p-5;
     }
 
+    /* The 404 card sets its own padding-block instead of joining the p-5 group above, so it
+       needs its own trim at this breakpoint. */
+    .notfound-card {
+        padding-block: 2rem;
+    }
+
+    /* The header stacks into three rows below this breakpoint, so it eats far more of the
+       viewport than the 4.5rem the desktop calc assumes. */
+    .notfound-stage {
+        min-height: calc(100svh - 17rem);
+    }
+
     .franchise-grid {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 0.75rem;
@@ -2764,6 +2849,7 @@
         opacity: 0.28;
     }
 
+    .notfound-card::before,
     .boot-loading__glow,
     .boot-loading__mascot,
     .boot-loading__shadow,

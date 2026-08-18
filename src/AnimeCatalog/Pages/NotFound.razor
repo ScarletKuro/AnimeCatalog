@@ -1,10 +1,19 @@
 @page "/not-found"
 
-<section class="stack stack--wide">
-    <div class="hero-card">
-        <p class="eyebrow">404</p>
+<PageTitle>Page not found · Anime Catalog</PageTitle>
+
+<section class="stack stack--wide notfound-stage">
+    @* Deliberately not a .hero-card: that block is a wide left-aligned page banner with a
+       19rem min-height, so four lines of 404 copy stranded the text in its top-left corner.
+       .notfound-card is centered and sized to its content instead. *@
+    <div class="notfound-card">
+        <p class="notfound-card__glyph" aria-hidden="true">404</p>
+        <p class="eyebrow">Lost route</p>
         <h1>Page not found</h1>
-        <p class="lede">The route you requested does not exist in this catalog.</p>
-        <NavLink href="catalog" class="button button--primary">Go to catalog</NavLink>
+        <p class="notfound-card__body">The route you requested does not exist in this catalog.</p>
+        <div class="button-row">
+            <NavLink href="catalog" class="button button--primary">Go to catalog</NavLink>
+            <NavLink href="" Match="NavLinkMatch.All" class="button button--ghost">Back to home</NavLink>
+        </div>
     </div>
 </section>
