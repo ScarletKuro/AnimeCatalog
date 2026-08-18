@@ -72,12 +72,14 @@ public sealed class AnimeSearchResultTests
             .Add(p => p.Media, media)
             .Add(p => p.ExistingAnimeEntryId, 7L));
 
-        Assert.Contains("In catalog", cut.Markup);
+        // Exact text, not a markup substring: "Not in catalog" contains "in catalog" too, so a
+        // Contains check here would pass even if the ternary were inverted.
+        Assert.Equal("In catalog", cut.Find(".search-result__catalog").TextContent.Trim());
         Assert.Contains("search-result--cataloged", cut.Markup);
     }
 
     [Fact]
-    public void LeavesResultUnmarkedWhenNotInTheCatalog()
+    public void StatesNotInCatalogWhenAbsent()
     {
         var media = new AniListMedia
         {
@@ -89,8 +91,33 @@ public sealed class AnimeSearchResultTests
         using var context = new BunitContext();
         var cut = context.Render<AnimeSearchResult>(parameters => parameters.Add(p => p.Media, media));
 
-        Assert.DoesNotContain("In catalog", cut.Markup);
+        // The line is always present now. Only the --cataloged modifier distinguishes the states
+        // structurally, so the row still renders unhighlighted.
+        Assert.Equal("Not in catalog", cut.Find(".search-result__catalog").TextContent.Trim());
         Assert.DoesNotContain("search-result--cataloged", cut.Markup);
+    }
+
+    [Fact]
+    public void CatalogLineIsPlainTextNotAPill()
+    {
+        var media = new AniListMedia
+        {
+            Id = 21,
+            Title = new AniListTitle { English = "One Piece" },
+            Format = "TV",
+            SeasonYear = 1999
+        };
+
+        using var context = new BunitContext();
+        var cut = context.Render<AnimeSearchResult>(parameters => parameters
+            .Add(p => p.Media, media)
+            .Add(p => p.ExistingAnimeEntryId, 7L));
+
+        // Every span inside .search-result__meta is styled as an uppercase pill, so the line has to
+        // live outside that row to read as plain text.
+        Assert.Empty(cut.FindAll(".search-result__meta .chip"));
+        Assert.Empty(cut.FindAll(".search-result__meta .search-result__catalog"));
+        Assert.NotNull(cut.Find(".search-result__content > .search-result__catalog"));
     }
 
     [Fact]

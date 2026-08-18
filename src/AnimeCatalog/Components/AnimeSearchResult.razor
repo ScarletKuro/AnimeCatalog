@@ -22,12 +22,11 @@
             {
                 <span>@Media.SeasonYear</span>
             }
-
-            @if (IsInCatalog)
-            {
-                <span class="chip chip--muted">In catalog</span>
-            }
         </div>
+
+        @* Its own line, outside .search-result__meta: every span in that row is styled as an
+           uppercase pill, and this states a fact about the result rather than tagging it. *@
+        <div class="search-result__catalog">@(IsInCatalog ? "In catalog" : "Not in catalog")</div>
     </div>
     <div class="search-result__indicator" aria-hidden="true">
         <span class="search-result__indicator-dot"></span>

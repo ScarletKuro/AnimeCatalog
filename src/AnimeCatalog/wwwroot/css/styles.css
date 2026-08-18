@@ -2146,8 +2146,12 @@
         padding: 0.25rem 0.375rem 0.25rem 0;
     }
 
+    /* appearance:none because this is a <button> laid out as a grid, and preflight sets
+       appearance:button on every button -- a native-appearance button drops the grid on some
+       engines and stacks the three columns into one centred box. .nav-toggle and
+       .profile-menu__trigger already carry the same workaround. */
     .search-result {
-        @apply grid w-full cursor-pointer rounded-[calc(var(--radius-lg)+0.1rem)] border p-0 text-left text-inherit;
+        @apply grid w-full cursor-pointer appearance-none rounded-[calc(var(--radius-lg)+0.1rem)] border p-0 text-left text-inherit;
         grid-template-columns: 5.75rem minmax(0, 1fr) auto;
         align-items: stretch;
         min-height: 8.625rem;
@@ -2199,10 +2203,14 @@
         color: var(--text-soft);
     }
 
+    /* No aspect-ratio here, deliberately. The track width is fixed and the row stretches to fit the
+       text, so a 2/3 ratio plus height:100% lets the ratio derive a WIDTH from the grown row height
+       -- wider than the poster's own column -- and the artwork slides out under the text. It only
+       showed on mobile because 4.75rem : 7.125rem is exactly 2:3, so rows sitting at their
+       min-height agreed with the ratio and nothing moved until the meta pills wrapped. Pinning the
+       width to the track and letting object-cover crop is what keeps it in its column. */
     .search-result__poster {
-        @apply h-full overflow-hidden;
-        aspect-ratio: 2 / 3;
-        align-self: stretch;
+        @apply h-full w-full overflow-hidden;
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
     }
 
@@ -2239,6 +2247,14 @@
         color: rgba(214, 227, 243, 0.88);
         background: rgba(255, 255, 255, 0.055);
         border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* Plain text, not a chip: being consistent between the two states is the whole point, and a
+       pill would read as one more metadata tag. Both states share one colour -- an already-added
+       result is signalled twice over already, by the dimmed poster and the dimmed title. */
+    .search-result__catalog {
+        @apply text-[0.78rem] font-medium;
+        color: var(--text-soft);
     }
 
     .search-result__indicator {
