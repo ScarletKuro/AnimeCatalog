@@ -188,7 +188,9 @@ public sealed class SupabaseRestService : ISupabaseRestService
 
         if (body is not null)
         {
-            request.Content = new StringContent(JsonSerializer.Serialize(body, JsonDefaults.Web), Encoding.UTF8, "application/json");
+            // Payload rather than Web: every write below names the columns it owns, so a null means
+            // clear that column and has to reach the API instead of being dropped.
+            request.Content = new StringContent(JsonSerializer.Serialize(body, JsonDefaults.Payload), Encoding.UTF8, "application/json");
         }
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);

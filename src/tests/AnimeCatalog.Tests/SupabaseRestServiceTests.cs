@@ -83,6 +83,39 @@ public sealed class SupabaseRestServiceTests
         Assert.Equal("Nyaight of the Living Cat", row.TitleRomaji);
     }
 
+    [Fact]
+    public async Task UpsertSingleAsync_SendsNullColumnsSoAValueCanBeCleared()
+    {
+        // A merge-duplicates upsert only touches the columns in the body, so dropping score=null
+        // used to make "clear the score" a no-op and the previous score came straight back.
+        string? requestBody = null;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"id":3,"anime_entry_id":101,"status":"watching","episodes_watched":6}""", Encoding.UTF8, "application/json")
+            };
+        });
+
+        var client = new HttpClient(handler);
+        var service = new SupabaseRestService(
+            client,
+            Microsoft.Extensions.Options.Options.Create(new SupabaseOptions { Url = "https://example.supabase.co", PublishableKey = "sb_publishable_123" }),
+            new StubTokenProvider("token-abc"));
+
+        await service.UpsertSingleAsync<CatalogEntryRow>("catalog_entries", new
+        {
+            anime_entry_id = 101L,
+            status = "watching",
+            score = (decimal?)null,
+            episodes_watched = 6
+        }, "anime_entry_id");
+
+        Assert.NotNull(requestBody);
+        Assert.Contains("\"score\":null", requestBody);
+    }
+
     private sealed class StubTokenProvider : IAccessTokenProvider
     {
         private readonly string? _token;
