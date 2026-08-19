@@ -412,13 +412,15 @@
     align-items: center;
     gap: calc(var(--spacing) * 3);
   }
+  .site-brand__mark, .login-card__mark {
+    background: radial-gradient(circle at 28% 25%, rgba(255, 255, 255, 0.85), transparent 24%), linear-gradient(135deg, #9ef0ff 0%, #6cd2ff 42%, #f5e598 100%);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 14px 30px rgba(73, 190, 255, 0.22);
+  }
   .site-brand__mark {
     display: block;
     height: calc(var(--spacing) * 9);
     width: calc(var(--spacing) * 9);
     border-radius: var(--radius-2xl);
-    background: radial-gradient(circle at 28% 25%, rgba(255, 255, 255, 0.85), transparent 24%), linear-gradient(135deg, #9ef0ff 0%, #6cd2ff 42%, #f5e598 100%);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 14px 30px rgba(73, 190, 255, 0.22);
   }
   .site-brand__title {
     font-size: 0.98rem;
@@ -875,7 +877,7 @@
   .stack--wide {
     gap: calc(var(--spacing) * 8);
   }
-  .hero-card, .panel, .filters-card, .error-card, .loading-card, .empty-card, .notfound-card, .access-card, .home-spotlight, .details-hero, .banner-hero {
+  .hero-card, .panel, .filters-card, .error-card, .loading-card, .empty-card, .notfound-card, .access-card, .login-card, .home-spotlight, .details-hero, .banner-hero {
     border-radius: var(--radius-xl);
     border-style: var(--tw-border-style);
     border-width: 1px;
@@ -2924,7 +2926,7 @@
     text-align: center;
     background: linear-gradient(180deg, rgba(15, 24, 40, 0.95), rgba(10, 18, 31, 0.9));
   }
-  .notfound-stage {
+  .notfound-stage, .login-stage {
     align-content: center;
     min-height: calc(100vh - 10.5rem);
     min-height: calc(100svh - 10.5rem);
@@ -3017,7 +3019,7 @@
     stroke-linejoin: round;
     stroke-width: 1.8;
   }
-  .access-card__body {
+  .access-card__body, .login-card__body {
     max-width: 26rem;
     --tw-leading: calc(var(--spacing) * 7);
     line-height: calc(var(--spacing) * 7);
@@ -3025,6 +3027,118 @@
   }
   .access-card .button {
     margin-top: var(--spacing);
+  }
+  .login-card {
+    margin-inline: auto;
+    display: grid;
+    max-width: 30rem;
+    justify-items: center;
+    gap: calc(var(--spacing) * 3);
+    overflow: hidden;
+    text-align: center;
+    position: relative;
+    isolation: isolate;
+    padding-block: 2.75rem;
+    padding-inline: 1.75rem;
+    border-color: rgba(158, 240, 255, 0.16);
+    background: radial-gradient(circle at top, rgba(158, 240, 255, 0.12), transparent 42%), linear-gradient(180deg, rgba(15, 24, 40, 0.96), rgba(10, 18, 31, 0.92));
+  }
+  .login-card::before {
+    content: "";
+    position: absolute;
+    top: 0.5rem;
+    left: 50%;
+    z-index: -1;
+    width: 15rem;
+    height: 15rem;
+    transform: translateX(-50%);
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(158, 240, 255, 0.2), transparent 68%);
+    filter: blur(10px);
+    pointer-events: none;
+    animation: loading-glow 3.6s ease-in-out infinite;
+  }
+  .login-card__mark {
+    display: block;
+    height: calc(var(--spacing) * 14);
+    width: calc(var(--spacing) * 14);
+    border-radius: 1.1rem;
+  }
+  .login-card .eyebrow {
+    margin-bottom: 0px;
+  }
+  .login-card h1 {
+    font-size: 1.9rem;
+    --tw-font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-extrabold);
+    @media (width >= 48rem) {
+      font-size: 2.15rem;
+    }
+  }
+  .login-card__actions {
+    display: grid;
+    width: 100%;
+    gap: calc(var(--spacing) * 2);
+  }
+  .login-card__actions .button {
+    width: 100%;
+  }
+  .login-card .panel__notice {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+  .button__icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+  }
+  .button__icon svg {
+    height: 1.15rem;
+    width: 1.15rem;
+    fill: currentColor;
+    stroke: none;
+  }
+  .login-card__meta {
+    margin: 0px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    column-gap: calc(var(--spacing) * 2);
+    row-gap: var(--spacing);
+    font-size: 0.68rem;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    --tw-tracking: 0.16em;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+  }
+  .login-card__meta span:not(:first-child)::before {
+    content: "·";
+    margin-right: 0.5rem;
+    color: rgba(255, 255, 255, 0.24);
+  }
+  .login-card__detail {
+    margin: 0px;
+    width: 100%;
+    border-radius: var(--radius-md);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    padding-inline: calc(var(--spacing) * 3);
+    padding-block: calc(var(--spacing) * 2);
+    text-align: left;
+    font-size: 0.75rem;
+    --tw-leading: calc(var(--spacing) * 6);
+    line-height: calc(var(--spacing) * 6);
+    background: rgba(2, 8, 18, 0.44);
+    border-color: rgba(255, 141, 146, 0.2);
+    color: var(--text-soft);
+    overflow-wrap: anywhere;
+  }
+  .login-card .disclosure {
+    margin-top: 0px;
   }
   .error-card {
     display: grid;
@@ -3668,10 +3782,13 @@
   .hero-card, .details-hero, .panel, .filters-card, .loading-card, .access-card, .error-card, .empty-card {
     padding: calc(var(--spacing) * 5);
   }
-  .notfound-card {
+  .notfound-card, .login-card {
     padding-block: 2rem;
   }
-  .notfound-stage {
+  .login-card {
+    padding-inline: 1.25rem;
+  }
+  .notfound-stage, .login-stage {
     min-height: calc(100svh - 9.5rem);
   }
   .franchise-grid {
@@ -3821,7 +3938,7 @@
     transform: none;
     opacity: 0.28;
   }
-  .notfound-card::before, .boot-loading__glow, .boot-loading__mascot, .boot-loading__shadow, .boot-loading__tail, .boot-loading__eye, .boot-loading__spark, .boot-loading__dots span {
+  .notfound-card::before, .login-card::before, .boot-loading__glow, .boot-loading__mascot, .boot-loading__shadow, .boot-loading__tail, .boot-loading__eye, .boot-loading__spark, .boot-loading__dots span {
     animation: none;
   }
 }

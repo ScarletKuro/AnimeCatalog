@@ -3,53 +3,101 @@
 @inject BrowserStorageService BrowserStorageService
 @inject NavigationManager NavigationManager
 
-<PageTitle>Login</PageTitle>
+<PageTitle>Sign in · Anime Catalog</PageTitle>
 
-<section class="stack stack--wide">
-    <div class="hero-card">
+@* Every state lives inside the one card. Deliberately not a .hero-card plus a .panel: that banner
+   is a wide left-aligned block with a 19rem min-height, so a page whose whole content is one
+   heading and one button left it empty on the right with the glow alone in the corner. Same
+   reasoning as .notfound-card and .access-card.
+
+   The mark, eyebrow and h1 sit outside every branch: Routes.razor focuses the h1 after
+   navigation, so it has to exist while the callback is completing and when auth is unconfigured. *@
+<section class="stack login-stage">
+    <div class="login-card">
+        <span class="login-card__mark" aria-hidden="true"></span>
         <p class="eyebrow">Owner access</p>
-        <h1>GitHub sign-in for catalog administration</h1>
-        <p class="lede">Read access depends on the current catalog visibility setting. Write access remains enforced by Supabase RLS and is available only to authenticated admins.</p>
-    </div>
+        <h1>@Heading</h1>
 
-    @if (!AuthService.IsConfigured)
-    {
-        <ErrorState Title="Supabase auth is not configured" Message="Set Supabase.Url and Supabase.PublishableKey in wwwroot/appsettings.json before using login." />
-    }
-    else if (_isCompletingCallback)
-    {
-        <LoadingIndicator Text="Completing GitHub sign-in..." />
-    }
-    else if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <ErrorState Title="Login failed" Message="@_error" />
-    }
-    else if (AuthService.IsAuthenticated)
-    {
-        <div class="panel">
-            <div class="panel__header">
-                <h2>Signed in</h2>
-            </div>
-            <p>You are signed in as <strong>@AuthService.CurrentSession?.User.DisplayName</strong>.</p>
-            <div class="button-row">
+        @if (AuthService.IsAuthenticated)
+        {
+            <p class="login-card__body">
+                Signed in as <strong>@AuthService.CurrentSession?.User.DisplayName</strong>. The session is kept in this
+                browser and refreshed through Supabase Auth.
+            </p>
+
+            <div class="login-card__actions">
                 <NavLink href="admin" class="button button--primary">Go to admin</NavLink>
                 <button type="button" class="button button--ghost" @onclick="LogoutAsync">Sign out</button>
             </div>
-        </div>
-    }
-    else
-    {
-        <div class="panel">
-            <div class="panel__header">
-                <h2>GitHub OAuth</h2>
+        }
+        else
+        {
+            <p class="login-card__body">
+                Reading the catalog follows the current visibility setting. Writing is enforced by Supabase RLS and stays
+                available to authenticated admins only.
+            </p>
+
+            @if (!AuthService.IsConfigured)
+            {
+                <p class="panel__notice" role="status">
+                    Supabase auth is not configured. Set Supabase.Url and Supabase.PublishableKey in
+                    wwwroot/appsettings.json.
+                </p>
+            }
+
+            <div class="login-card__actions">
+                @* One button across the not-configured, pending and ready states rather than three
+                   branches of the same markup: only its label and disabled flag differ. *@
+                <button type="button" class="button button--primary" disabled="@IsSignInDisabled" @onclick="SignInAsync">
+                    <span class="button__icon" aria-hidden="true">
+                        <svg viewBox="0 0 16 16" focusable="false">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-2.98-.88-2.98-2.9 0-.58.21-1.07.55-1.45-.05-.13-.24-.66.05-1.37 0 0 .59-.19 1.94.72a5.4 5.4 0 0 1 2.9 0c1.35-.92 1.94-.72 1.94-.72.29.71.1 1.24.05 1.37.34.38.55.87.55 1.45 0 2.03-1.21 2.7-2.99 2.9.31.27.58.79.58 1.6 0 1.15-.01 2.09-.01 2.38 0 .21.15.46.55.38A7.99 7.99 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+                        </svg>
+                    </span>
+                    @SignInLabel
+                </button>
             </div>
-            <p>Use the GitHub provider configured in Supabase Auth. The session is stored in browser storage and refreshed through Supabase Auth.</p>
-            <button type="button" class="button button--primary" @onclick="SignInAsync">Sign in with GitHub</button>
-        </div>
-    }
+
+            @if (_isCompletingCallback)
+            {
+                <p class="action-feedback" role="status">Exchanging the GitHub code for a Supabase session...</p>
+            }
+        }
+
+        @* Failure is a receipt under the button, not a card replacing it: the previous ErrorState
+           branch removed the sign-in button, which left a failed callback with no way to retry. *@
+        @if (_feedback is not null)
+        {
+            <p class="@_feedback.CssClass" role="status">@_feedback.Message</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_errorDetail))
+        {
+            @* The raw Supabase payload is diagnostic, not a message for the visitor, so it stays
+               collapsed behind the shared disclosure. *@
+            <DisclosureButton Expanded="_showErrorDetail"
+                              CollapsedLabel="Show technical detail"
+                              ExpandedLabel="Hide technical detail"
+                              ControlsId="login-error-detail"
+                              OnToggle="ToggleErrorDetail" />
+
+            @if (_showErrorDetail)
+            {
+                <p class="login-card__detail" id="login-error-detail">@_errorDetail</p>
+            }
+        }
+
+        <p class="login-card__meta">
+            <span>GitHub OAuth</span>
+            <span>PKCE</span>
+            <span>Admins only</span>
+        </p>
+    </div>
 </section>
 
 @code {
+    private const string SignInFailureMessage = "GitHub sign-in could not be completed. Try again.";
+
     [SupplyParameterFromQuery]
     private string? Code { get; set; }
 
@@ -57,8 +105,16 @@
     private string? ReturnUrl { get; set; }
 
     private bool _isCompletingCallback;
-    private string? _error;
+    private ActionFeedback? _feedback;
+    private string? _errorDetail;
+    private bool _showErrorDetail;
     private bool _callbackHandled;
+
+    private string Heading => AuthService.IsAuthenticated ? "You are signed in" : "Sign in to Anime Catalog";
+
+    private string SignInLabel => _isCompletingCallback ? "Completing sign-in..." : "Sign in with GitHub";
+
+    private bool IsSignInDisabled => !AuthService.IsConfigured || _isCompletingCallback;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -79,7 +135,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            ReportFailure(ex);
         }
         finally
         {
@@ -89,12 +145,33 @@
 
     private async Task SignInAsync()
     {
-        _error = null;
-        await AuthService.StartGitHubSignInAsync(ReturnUrl);
+        _feedback = null;
+        _errorDetail = null;
+        _showErrorDetail = false;
+
+        try
+        {
+            await AuthService.StartGitHubSignInAsync(ReturnUrl);
+        }
+        catch (Exception ex)
+        {
+            // StartGitHubSignInAsync throws when Supabase configuration is incomplete. The
+            // configuration notice above renders first today, but the button is no longer removed
+            // from the page in any state, so the throw is now reachable.
+            ReportFailure(ex);
+        }
     }
 
     private async Task LogoutAsync()
     {
         await AuthService.LogoutAsync();
+    }
+
+    private void ToggleErrorDetail() => _showErrorDetail = !_showErrorDetail;
+
+    private void ReportFailure(Exception exception)
+    {
+        _feedback = ActionFeedback.Error(SignInFailureMessage);
+        _errorDetail = exception.Message;
     }
 }
