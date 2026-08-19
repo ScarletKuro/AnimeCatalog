@@ -19,11 +19,14 @@
             <label class="field"><span class="field-label">Year</span><InputNumber class="text-input" @bind-Value="Model.SeasonYear" /></label>
             <label class="field"><span class="field-label">Episodes</span><InputNumber class="text-input" @bind-Value="Model.Episodes" @bind-Value:after="SyncWatchedToTotalWhenCompleted" min="0" /></label>
             <label class="field"><span class="field-label">Display order</span><InputNumber class="text-input" @bind-Value="Model.DisplayOrder" /></label>
-            <div class="field">
+            @* These three are segmented tracks rather than single inputs, so a half-row column
+               squeezes their cells to the minimum and frays them into several short rows. Given
+               the full width they each lay out as one band. *@
+            <div class="field field--wide">
                 <span class="field-label">Status</span>
                 <CatalogStatusPicker Value="Model.Status" ValueChanged="HandleStatusChangedAsync" />
             </div>
-            <div class="field">
+            <div class="field field--wide">
                 <span class="field-label">Score</span>
                 <ScorePicker @bind-Value="Model.Score" />
             </div>
@@ -31,7 +34,7 @@
                keeps the model matching them while the field is gone. *@
             @if (EpisodePicker.IsEditable(Model.Status, Model.Episodes))
             {
-                <div class="field">
+                <div class="field field--wide">
                     <span class="field-label">Episodes watched</span>
                     <EpisodePicker Value="Model.EpisodesWatched"
                                    Max="Model.Episodes"

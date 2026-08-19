@@ -2027,9 +2027,9 @@
     }
 
     /* A segmented track, not free-floating pills: equal-width grid cells cannot wrap into
-       the ragged rows of isolated capsules that flex-wrap produced at mid widths, where
-       .editor-grid gives this field only half a row. Surface matches .text-input so the
-       Status field reads as a sibling of the inputs beside it. */
+       the ragged rows of isolated capsules that flex-wrap produced at mid widths, such as
+       the narrow .details-layout__rail. Surface matches .text-input so the Status field
+       reads as a sibling of the inputs beside it. */
     .status-picker {
         @apply grid gap-1 rounded-[var(--radius-md)] border p-1;
         grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
@@ -2129,9 +2129,9 @@
         color: var(--text-soft);
     }
 
-    /* Same segmented track as .status-picker, for the same reason: .editor-grid gives this
-       field half a row, and equal-width auto-fit cells cannot fray into ragged rows of
-       capsules the way flex-wrap does. A long-running series pushes the range past a
+    /* Same segmented track as .status-picker, for the same reason: the narrow
+       .details-layout__rail would fray free-floating capsules into ragged rows, and
+       equal-width auto-fit cells cannot. A long-running series pushes the range past a
        thousand cells, so the track caps its height and scrolls like
        .franchise-picker__results rather than shoving the panel off screen. */
     .episode-picker__options {
