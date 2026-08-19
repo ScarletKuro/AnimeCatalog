@@ -67,6 +67,7 @@ public sealed class CatalogTests
         access = new GatedCatalogAccessService();
         var franchiseService = new FranchiseService();
 
+        context.Services.AddSingleton<IAuthStateNotifier>(new StubAuthStateNotifier());
         context.Services.AddSingleton<ICatalogAccessService>(access);
         context.Services.AddSingleton<ISupabaseRestService>(new EmptySupabaseRestService());
         context.Services.AddSingleton<IAniListEnrichmentService>(new NoOpAniListEnrichmentService());

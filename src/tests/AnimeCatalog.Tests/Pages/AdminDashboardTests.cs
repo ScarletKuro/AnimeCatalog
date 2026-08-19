@@ -43,6 +43,7 @@ public sealed class AdminDashboardTests
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
 
+        context.Services.AddSingleton<IAuthStateNotifier>(sp => sp.GetRequiredService<AuthService>());
         context.Services.AddSingleton<ICatalogAccessService>(new UnusedCatalogAccessService());
         context.Services.AddSingleton<ISupabaseRestService>(new UnusedSupabaseRestService());
         context.Services.AddSingleton(new FranchiseService());

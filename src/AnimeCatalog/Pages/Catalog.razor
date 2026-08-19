@@ -3,6 +3,11 @@
 
 <PageTitle>Catalog</PageTitle>
 
+@* Sign-out has to take the content off screen here and now: with visibility set to private the
+   rendered catalog is no longer readable by this visitor, and nothing else re-runs the access check
+   until a navigation or a hard refresh. *@
+<AuthStateWatcher OnIdentityChanged="ReloadForAuthChangeAsync" />
+
 <section class="stack">
     <div class="page-header">
         <div>
@@ -95,6 +100,20 @@
     private IReadOnlyList<FranchiseSummaryViewModel> _items = [];
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    // _hasLoaded is what keeps the filters above the fold hidden until access is settled (see the
+    // comment on the loading branch). LoadAsync only resets _isLoading, which gates the grid *below*
+    // the filters card - so a sign-out has to drop back to the pre-access state here, or a private
+    // catalog flashes a search bar before refusing access. The filters themselves are deliberately
+    // kept: the identity changed, not the query the visitor typed.
+    private Task ReloadForAuthChangeAsync()
+    {
+        _hasLoaded = false;
+        _items = [];
+        _error = null;
+        _accessState = CatalogAccessState.Available;
+        return LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

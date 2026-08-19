@@ -24,6 +24,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredServ
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<IAccessTokenProvider>(sp => sp.GetRequiredService<AuthService>());
 builder.Services.AddScoped<IAdminAuthorizationService>(sp => sp.GetRequiredService<AuthService>());
+builder.Services.AddScoped<IAuthStateNotifier>(sp => sp.GetRequiredService<AuthService>());
 builder.Services.AddScoped<SupabaseRestService>();
 builder.Services.AddScoped<ISupabaseRestService>(sp => sp.GetRequiredService<SupabaseRestService>());
 builder.Services.AddScoped<AniListService>();

@@ -85,6 +85,7 @@ public sealed class PrivateCatalogPageTests
         var supabase = new UnexpectedReadSupabaseRestService();
         var franchiseService = new FranchiseService();
 
+        context.Services.AddSingleton<IAuthStateNotifier>(sp => sp.GetRequiredService<AuthService>());
         context.Services.AddSingleton<ICatalogAccessService>(accessService);
         context.Services.AddSingleton(sp => new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()));
         context.Services.AddSingleton<ISupabaseRestService>(supabase);

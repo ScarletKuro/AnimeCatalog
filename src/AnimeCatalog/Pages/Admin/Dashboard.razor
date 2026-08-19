@@ -4,6 +4,11 @@
 
 <PageTitle>Admin</PageTitle>
 
+@* Sign-out has to take the content off screen here and now: with visibility set to private the
+   rendered catalog is no longer readable by this visitor, and nothing else re-runs the access check
+   until a navigation or a hard refresh. *@
+<AuthStateWatcher OnIdentityChanged="LoadAsync" />
+
 <section class="stack">
     @* The header and its h1 stay outside every state branch: Routes.razor focuses the h1 after
        navigation, so it has to exist while loading and while access is refused. *@

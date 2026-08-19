@@ -6,6 +6,11 @@
 
 <PageTitle>@_pageTitle</PageTitle>
 
+@* Sign-out has to take the content off screen here and now: with visibility set to private the
+   rendered catalog is no longer readable by this visitor, and nothing else re-runs the access check
+   until a navigation or a hard refresh. *@
+<AuthStateWatcher OnIdentityChanged="LoadAsync" />
+
 <section class="stack stack--wide">
     @if (!CatalogService.IsConfigured)
     {
@@ -278,7 +283,12 @@
         }
         finally
         {
-            _isLoading = false;
+            // A newer load (auth change, retry, or a new slug) already owns the page state by the time
+            // a cancelled one unwinds; it must not write _isLoading back underneath it.
+            if (!token.IsCancellationRequested)
+            {
+                _isLoading = false;
+            }
         }
 
         if (_details is { Stats.EntryCount: > 0 })

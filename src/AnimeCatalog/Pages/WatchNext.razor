@@ -6,6 +6,11 @@
 
 <PageTitle>Watch next · Anime Catalog</PageTitle>
 
+@* Sign-out has to take the content off screen here and now: with visibility set to private the
+   rendered catalog is no longer readable by this visitor, and nothing else re-runs the access check
+   until a navigation or a hard refresh. *@
+<AuthStateWatcher OnIdentityChanged="ReloadForAuthChangeAsync" />
+
 <section class="stack stack--wide">
     <div class="page-header">
         <div>
@@ -184,6 +189,19 @@
     private bool _hideUnaired;
 
     protected override Task OnInitializedAsync() => StartScanAsync();
+
+    // StartScanAsync returns before it reaches _cts when IsAdmin is false, so a sign-out mid-scan has
+    // to cancel here or the walk keeps burning AniList requests for a visitor who just lost access to
+    // the results. Not disposed: StartScanAsync and Dispose both own that, and CTS disposal is
+    // idempotent.
+    private Task ReloadForAuthChangeAsync()
+    {
+        _cts?.Cancel();
+        _isScanning = false;
+        _scan = null;
+        _error = null;
+        return StartScanAsync();
+    }
 
     private async Task StartScanAsync()
     {

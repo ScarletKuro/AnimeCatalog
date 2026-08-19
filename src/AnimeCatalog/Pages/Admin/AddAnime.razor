@@ -7,6 +7,11 @@
 
 <PageTitle>Add anime</PageTitle>
 
+@* Sign-out has to take the content off screen here and now: with visibility set to private the
+   rendered catalog is no longer readable by this visitor, and nothing else re-runs the access check
+   until a navigation or a hard refresh. *@
+<AuthStateWatcher OnIdentityChanged="ReloadForAuthChangeAsync" />
+
 <section class="stack">
     <div class="page-header">
         <div>
@@ -153,7 +158,21 @@
     private bool _scrollSearchIntoViewPending;
     private string? _error;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAdminDataAsync();
+
+    // The in-progress draft (_model/_inspection) is deliberately left alone: it is client-side only,
+    // the !IsAdmin branch hides it, and discarding it would be the one thing here a visitor cannot get
+    // back. Only the server-derived lists are re-fetched.
+    private async Task ReloadForAuthChangeAsync()
+    {
+        _lastSaved = null;
+        _error = null;
+        _franchises = [];
+        _catalogedAniListIds = [];
+        await LoadAdminDataAsync();
+    }
+
+    private async Task LoadAdminDataAsync()
     {
         if (AuthService.IsAdmin)
         {

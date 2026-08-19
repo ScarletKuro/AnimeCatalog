@@ -1,0 +1,49 @@
+@inject IAuthStateNotifier AuthStateNotifier
+@implements IDisposable
+
+@* Renders nothing. It exists so a page can re-run its own load when the signed-in identity changes,
+   without every page repeating the subscribe/compare/unsubscribe dance - and without Routes.razor
+   re-keying the routed view, which would tear down MainLayout, NavMenu's JS registrations and the
+   focused element along with the page.
+
+   Place it outside every conditional branch. Inside one it would unmount exactly when the page stops being
+   able to see the data, which is the moment the subscription is needed. *@
+
+@code {
+    [Parameter, EditorRequired]
+    public EventCallback OnIdentityChanged { get; set; }
+
+    private string _identity = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        // Captured rather than assumed anonymous: InitializeAsync may already have restored a
+        // session long before this page mounted, and that is not a change the page must react to.
+        _identity = CurrentIdentity;
+        AuthStateNotifier.StateChanged += HandleStateChanged;
+    }
+
+    // AuthService raises StateChanged on token refresh too, where nothing about what Supabase will
+    // answer has changed. Reloading on that would silently throw away the search text, status filter
+    // and sort the visitor typed into Catalog. Only the user id and the admin flag decide what the
+    // RPCs return, so only those two are the identity.
+    private string CurrentIdentity =>
+        $"{AuthStateNotifier.CurrentUserId ?? "anonymous"}|{(AuthStateNotifier.IsAdmin ? "admin" : "user")}";
+
+    private void HandleStateChanged()
+    {
+        var identity = CurrentIdentity;
+        if (string.Equals(identity, _identity, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _identity = identity;
+
+        // Marshalled onto the renderer, same as NavMenu: StateChanged is raised from whatever
+        // continuation finished the auth call, not from a render.
+        _ = InvokeAsync(() => OnIdentityChanged.InvokeAsync());
+    }
+
+    public void Dispose() => AuthStateNotifier.StateChanged -= HandleStateChanged;
+}

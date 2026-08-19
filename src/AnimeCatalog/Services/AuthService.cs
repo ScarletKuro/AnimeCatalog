@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 
 namespace AnimeCatalog.Services;
 
-public sealed class AuthService : IAccessTokenProvider, IAdminAuthorizationService
+public sealed class AuthService : IAccessTokenProvider, IAdminAuthorizationService, IAuthStateNotifier
 {
     private const string SessionStorageKey = "animeCatalog.auth.session";
     private const string PkceVerifierStorageKey = "animeCatalog.auth.pkce.verifier";
@@ -43,6 +43,11 @@ public sealed class AuthService : IAccessTokenProvider, IAdminAuthorizationServi
     public event Action? StateChanged;
 
     public AuthSession? CurrentSession => _session;
+
+    // The session id, not the access token: a refresh replaces the token but not the user, and
+    // subscribers have to be able to tell those two apart.
+    public string? CurrentUserId => _session?.User.Id;
+
     public bool IsAuthenticated => _session is not null;
     public bool IsAdmin => _isAdmin;
 

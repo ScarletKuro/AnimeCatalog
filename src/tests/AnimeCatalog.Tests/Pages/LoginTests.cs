@@ -110,6 +110,7 @@ public sealed class LoginTests
         }
 
         context.Services.AddSingleton(sp => new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()));
+        context.Services.AddSingleton<IAuthStateNotifier>(sp => sp.GetRequiredService<AuthService>());
         context.Services.AddSingleton(sp => new AuthService(
             new HttpClient(new StubIsAdminHandler()),
             new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()),

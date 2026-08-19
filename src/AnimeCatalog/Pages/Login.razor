@@ -5,6 +5,13 @@
 
 <PageTitle>Sign in · Anime Catalog</PageTitle>
 
+@* Re-render only, never a reload: the card is rendered from AuthService.IsAuthenticated and today
+   only refreshes because its own click handlers do, so signing out from the nav drawer while
+   sitting here left it stale. StateHasChanged does not re-run OnParametersSetAsync, which is what
+   keeps the _callbackHandled OAuth guard intact - wiring this page to a load path would re-enter
+   HandleOAuthCallbackAsync with a consumed auth code. *@
+<AuthStateWatcher OnIdentityChanged="StateHasChanged" />
+
 @* Every state lives inside the one card. Deliberately not a .hero-card plus a .panel: that banner
    is a wide left-aligned block with a 19rem min-height, so a page whose whole content is one
    heading and one button left it empty on the right with the glow alone in the corner. Same

@@ -6,6 +6,11 @@
 
 <PageTitle>Edit anime</PageTitle>
 
+@* Sign-out has to take the content off screen here and now: with visibility set to private the
+   rendered catalog is no longer readable by this visitor, and nothing else re-runs the access check
+   until a navigation or a hard refresh. *@
+<AuthStateWatcher OnIdentityChanged="LoadAsync" />
+
 <section class="stack">
     <div class="page-header">
         <div>
@@ -57,6 +62,15 @@
 
     private async Task LoadAsync()
     {
+        // Same guard Dashboard uses: the markup already hides everything behind !IsAdmin, and an
+        // auth-change reload must not fire a request that Supabase is going to refuse anyway.
+        if (!AuthService.IsAdmin)
+        {
+            _isLoading = false;
+            _model = null;
+            return;
+        }
+
         try
         {
             _isLoading = true;

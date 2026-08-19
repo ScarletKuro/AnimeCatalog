@@ -5,6 +5,11 @@
 
 <PageTitle>Anime Catalog</PageTitle>
 
+@* Sign-out has to take the content off screen here and now: with visibility set to private the
+   rendered catalog is no longer readable by this visitor, and nothing else re-runs the access check
+   until a navigation or a hard refresh. *@
+<AuthStateWatcher OnIdentityChanged="LoadAsync" />
+
 <section class="stack stack--wide">
     @* Outside the state branches on purpose: Routes.razor focuses the h1 after navigation, so it has
        to exist during the loading and error states too. No action buttons in here either — the sticky
@@ -309,7 +314,12 @@
         }
         finally
         {
-            _isLoading = false;
+            // A newer load (auth change, retry, or a new slug) already owns the page state by the time
+            // a cancelled one unwinds; it must not write _isLoading back underneath it.
+            if (!token.IsCancellationRequested)
+            {
+                _isLoading = false;
+            }
         }
 
         // Not awaited: everything above is already renderable from Supabase alone.
