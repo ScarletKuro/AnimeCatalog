@@ -1,0 +1,45 @@
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+@* Both admin gates in one component, so every admin page keeps a single !IsAdmin branch instead of
+   an IsAuthenticated/IsAdmin pair. The two states need different answers: an anonymous visitor can
+   fix this by signing in, while a signed-in visitor who is not in app_admins cannot - for them the
+   only thing that helps is coming back as a different account.
+
+   No StateChanged subscription: the click handler below re-renders this component, and the parent's
+   !IsAdmin branch stays true either way. *@
+@if (!AuthService.IsAuthenticated)
+{
+    <AccessState Title="@AuthenticationRequiredTitle" Message="@($"Sign in with GitHub before {Purpose}.")">
+        <Action>
+            <NavLink href="@LoginLink.ForCurrentPage(NavigationManager)" class="button button--primary">Sign in</NavLink>
+        </Action>
+    </AccessState>
+}
+else
+{
+    <AccessState Badge="AccessBadge.Shield" Title="@AdminRequiredTitle" Message="@AdminRequiredMessage">
+        <Action>
+            <NavLink href="catalog" class="button button--primary">Back to catalog</NavLink>
+            <button type="button" class="button button--ghost" @onclick="SignOutAsync">Sign out</button>
+        </Action>
+    </AccessState>
+}
+
+@code {
+    private const string AuthenticationRequiredTitle = "Authentication required";
+    private const string AdminRequiredTitle = "Admin access required";
+
+    private const string AdminRequiredMessage =
+        "Your account is signed in but is not present in app_admins. Sign in with an approved account, " +
+        "or ask an admin to add it.";
+
+    /// <summary>What the page is for, completing "Sign in with GitHub before ...".</summary>
+    [Parameter]
+    public string Purpose { get; set; } = "using the admin tools";
+
+    private async Task SignOutAsync()
+    {
+        await AuthService.LogoutAsync();
+    }
+}

@@ -18,7 +18,7 @@
 
     @if (!AuthService.IsAdmin)
     {
-        <ErrorState Title="Admin access required" Message="Only users present in app_admins can add anime." />
+        <AdminAccessState Purpose="adding anime" />
     }
     else
     {

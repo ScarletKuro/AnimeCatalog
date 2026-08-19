@@ -1,17 +1,12 @@
 @inject NavigationManager NavigationManager
 
-<div class="access-card">
-    <span class="access-card__badge" aria-hidden="true">
-        <svg viewBox="0 0 20 20" focusable="false">
-            <rect x="4.25" y="8.5" width="11.5" height="8" rx="2.25" />
-            <path d="M7 8.5V6.25a3 3 0 0 1 6 0V8.5" />
-            <path d="M10 11.75v2" />
-        </svg>
-    </span>
-    <h3>@Title</h3>
-    <p class="access-card__body">@Message</p>
-    <NavLink href="@LoginHref" class="button button--primary">Sign in</NavLink>
-</div>
+@* Thin wrapper over AccessState: it exists to own the catalog-visibility wording and the sign-in
+   link, so the card surface itself stays shared with the admin gates. *@
+<AccessState Title="@Title" Message="@Message">
+    <Action>
+        <NavLink href="@LoginLink.ForCurrentPage(NavigationManager)" class="button button--primary">Sign in</NavLink>
+    </Action>
+</AccessState>
 
 @code {
     [Parameter]
@@ -19,16 +14,4 @@
 
     [Parameter]
     public string Message { get; set; } = AnimeCatalog.Infrastructure.CatalogAccess.PrivateMessage;
-
-    private string LoginHref
-    {
-        get
-        {
-            var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-            // "." keeps the value non-empty for the home page so it survives the
-            // IsNullOrWhiteSpace check in AuthService and still resolves to the base href.
-            var returnUrl = string.IsNullOrWhiteSpace(relativePath) ? "." : relativePath;
-            return $"login?returnUrl={Uri.EscapeDataString(returnUrl)}";
-        }
-    }
 }

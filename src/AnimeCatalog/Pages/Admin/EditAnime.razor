@@ -17,7 +17,7 @@
 
     @if (!AuthService.IsAdmin)
     {
-        <ErrorState Title="Admin access required" Message="Only application admins can edit entries." />
+        <AdminAccessState Purpose="editing entries" />
     }
     else if (_isLoading)
     {

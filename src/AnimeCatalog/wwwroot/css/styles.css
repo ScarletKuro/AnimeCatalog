@@ -2436,6 +2436,12 @@
         @apply mt-1;
     }
 
+    /* .button-row is left-aligned for page banners; inside a centred card its buttons have to sit
+       under the message they answer. */
+    .access-card .button-row {
+        @apply justify-center;
+    }
+
     /* Sign-in route. Third member of the single-purpose-card family, and for the same reason as
        the other two: .hero-card is a 19rem left-aligned page banner, which left one eyebrow, one
        heading and one button stranded in its top-left corner. Centred on the viewport rather

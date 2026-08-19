@@ -3028,6 +3028,9 @@
   .access-card .button {
     margin-top: var(--spacing);
   }
+  .access-card .button-row {
+    justify-content: center;
+  }
   .login-card {
     margin-inline: auto;
     display: grid;

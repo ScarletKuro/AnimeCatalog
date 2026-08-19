@@ -15,13 +15,11 @@
         </div>
     </div>
 
-    @if (!AuthService.IsAuthenticated)
+    @* One branch for both refusals: IsAdmin is false without a session too, and AdminAccessState
+       tells the anonymous and the non-admin cases apart itself. *@
+    @if (!AuthService.IsAdmin)
     {
-        <ErrorState Title="Authentication required" Message="Sign in with GitHub before opening the admin dashboard." />
-    }
-    else if (!AuthService.IsAdmin)
-    {
-        <ErrorState Title="Admin access required" Message="Your user is authenticated but is not present in app_admins." />
+        <AdminAccessState Purpose="opening the admin dashboard" />
     }
     else if (_isLoading)
     {
