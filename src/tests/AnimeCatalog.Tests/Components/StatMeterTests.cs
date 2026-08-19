@@ -1,3 +1,4 @@
+using System.Globalization;
 using AnimeCatalog.Components;
 using Bunit;
 
@@ -27,6 +28,9 @@ public sealed class StatMeterTests
     [InlineData(12, 24, "--meter-value:50%")]
     [InlineData(30, 24, "--meter-value:100%")]
     [InlineData(-5, 24, "--meter-value:0%")]
+    // A 12-episode anime: the percentages that are not whole numbers, which is the common case.
+    [InlineData(4, 12, "--meter-value:33.3%")]
+    [InlineData(7, 12, "--meter-value:58.3%")]
     public void FillWidth_IsClampedPercentage(double value, double max, string expected)
     {
         using var context = new BunitContext();
@@ -37,6 +41,41 @@ public sealed class StatMeterTests
             .Add(p => p.Max, max));
 
         Assert.Contains(expected, cut.Markup);
+    }
+
+    // Regression: the fill width used to be interpolated with CurrentCulture. Blazor WebAssembly
+    // takes that from the browser, so on an Estonian phone "33.3" became "33,3", which is a valid
+    // custom property but invalid once substituted into `width:` -- width fell back to its initial
+    // `auto` and the bar rendered full at every fractional percentage.
+    [Fact]
+    public void FillWidth_UsesAnInvariantDecimalSeparator_OnCommaDecimalLocales()
+    {
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("et-EE");
+
+        try
+        {
+            using var context = new BunitContext();
+
+            var cut = context.Render<StatMeter>(parameters => parameters
+                .Add(p => p.Label, "Episodes watched")
+                .Add(p => p.Value, 4.5)
+                .Add(p => p.Max, 12));
+
+            // Guards against a vacuous pass: the visible readout is deliberately localised, so it
+            // must show a comma here. If it does not, the culture never reached the component and
+            // the assertions below would prove nothing.
+            Assert.Contains("4,5 / 12", cut.Markup);
+
+            // 4.5 / 12 * 100 = 37.5, which has to reach CSS and ARIA with a dot.
+            Assert.Contains("--meter-value:37.5%", cut.Markup);
+            Assert.DoesNotContain("--meter-value:37,5%", cut.Markup);
+            Assert.Equal("4.5", cut.Find(".stat-meter__track").GetAttribute("aria-valuenow"));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 
     [Fact]

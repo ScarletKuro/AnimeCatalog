@@ -1,3 +1,5 @@
+@using System.Globalization
+
 <div class="stat-meter">
     @if (ShowHead)
     {
@@ -13,10 +15,10 @@
          aria-labelledby="@(ShowHead ? _labelId : null)"
          aria-label="@(ShowHead ? null : Label)"
          aria-valuemin="0"
-         aria-valuemax="@Max"
-         aria-valuenow="@Value"
+         aria-valuemax="@MaxAria"
+         aria-valuenow="@ValueAria"
          aria-valuetext="@DisplayValue">
-        <span class="stat-meter__fill stat-meter__fill--@Variant" style="@($"--meter-value:{Percent}%")"></span>
+        <span class="stat-meter__fill stat-meter__fill--@Variant" style="@($"--meter-value:{PercentCss}%")"></span>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(Caption))
@@ -60,5 +62,22 @@
         ? 0
         : Math.Round(Math.Clamp(Value / Max * 100, 0, 100), 1);
 
+    // Invariant, never CurrentCulture: Blazor WebAssembly takes CurrentCulture from the browser, so
+    // on a comma-decimal locale (et-EE, ru-RU, de-DE...) 33.3 formats as "33,3". A custom property
+    // accepts that token stream happily, but substituting it into `width: var(--meter-value, 0%)` is
+    // invalid at computed-value time, which makes the declaration `unset` -- width then takes its
+    // initial `auto`, and the fill spans the whole track. The declared 0% fallback does NOT rescue
+    // it, because fallbacks only fire when the property is unset, and no earlier declaration wins
+    // either, so this cannot be defended against from the CSS side.
+    private string PercentCss => Percent.ToString(CultureInfo.InvariantCulture);
+
+    // aria-valuenow / aria-valuemax must be valid decimal numbers per ARIA, and "7,8" is not one.
+    // The Average score and Weighted mean meters (AnimeDetails.razor) pass fractional values.
+    private string ValueAria => Value.ToString(CultureInfo.InvariantCulture);
+
+    private string MaxAria => Max.ToString(CultureInfo.InvariantCulture);
+
+    // Deliberately left culture-sensitive: this is visible text, so "7,8 / 10" is correct on a
+    // comma locale. Only the CSS and ARIA numbers above are pinned to invariant.
     private string DisplayValue => ValueText ?? $"{Value:0.#} / {Max:0.#}";
 }
