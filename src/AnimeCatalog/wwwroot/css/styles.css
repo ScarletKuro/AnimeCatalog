@@ -144,29 +144,36 @@
         @apply flex shrink-0 items-center gap-3;
     }
 
-    /* The brand mark, shared with the login card so the app mark is drawn from one image.
-       Only the size differs between the two, and that stays with each of them. The url() is
-       resolved against this stylesheet rather than the document, so it survives the /AnimeCatalog/
-       base href the Pages deploy rewrites in.
-
-       Every box below carries an explicit width AND height in the ratio of the source file
-       (512x313). .site-brand is a flex row and .login-card a justify-items-center grid, so an
-       aspect-ratio box sized from one axis resolves differently in each; contain then keeps the
-       slime undistorted even if a pair is slightly off. */
+    /* The brand tile, shared with the login card so the app mark is drawn from one gradient.
+       Only the size differs between the two, and that stays with each of them. */
     .site-brand__mark,
     .login-card__mark {
-        @apply block;
-        background: center / contain no-repeat url("../img/slime.png");
-        /* A box-shadow would trace the box, not the slime, and the PNG is mostly transparent.
-           Kept shallow so it reads as a glow under the 2.25rem header mark rather than a cast
-           shadow; at 3.5rem on the login card the card's own ::before halo carries the depth. */
-        filter: drop-shadow(0 6px 14px rgba(73, 190, 255, 0.3));
+        @apply relative;
+        background:
+            radial-gradient(circle at 28% 25%, rgba(255, 255, 255, 0.85), transparent 24%),
+            linear-gradient(135deg, #9ef0ff 0%, #6cd2ff 42%, #f5e598 100%);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 14px 30px rgba(73, 190, 255, 0.22);
     }
 
-    /* shrink-0 because the mobile breakpoint below makes .site-brand itself shrinkable: the title
-       is what gives way there, not the mark. */
+    /* The mascot sits on the tile as a pseudo-element rather than a third background layer: the
+       slime is as light as the gradient under it and washes out at 2.25rem without a shadow, and
+       only an element can carry one that traces the artwork. A filter on the tile itself would
+       outline the square, and a background layer cannot have a shadow at all.
+
+       Width is a percentage with height auto - the source is 512x313, so on a square tile width
+       is always the binding axis and the slime scales without being cropped. The url() resolves
+       against this stylesheet rather than the document, so it survives the /AnimeCatalog/ base
+       href the Pages deploy rewrites in. */
+    .site-brand__mark::before,
+    .login-card__mark::before {
+        content: "";
+        @apply absolute inset-0;
+        background: center / 84% auto no-repeat url("../img/slime.png");
+        filter: drop-shadow(0 1px 3px rgba(4, 26, 48, 0.5));
+    }
+
     .site-brand__mark {
-        @apply h-9 w-[3.7rem] shrink-0;
+        @apply block h-10 w-10 rounded-2xl;
     }
 
     .site-brand__title {
@@ -2490,7 +2497,8 @@
     }
 
     .login-card__mark {
-        @apply h-14 w-[5.72rem];
+        @apply block h-14 w-14;
+        border-radius: 1.1rem;
     }
 
     /* .eyebrow ships an mb-2 for stacked headers; the grid gap already spaces it here. */
