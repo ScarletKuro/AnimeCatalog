@@ -1,25 +1,22 @@
 <div class="score-picker">
     <div class="score-picker__controls">
-        <button
-            type="button"
-            class="@(Value is null ? "score-picker__clear score-picker__clear--selected" : "score-picker__clear")"
-            @onclick="ClearAsync">
-            Unrated
-        </button>
-
         <div class="score-picker__stars" role="radiogroup" aria-label="Score">
             @foreach (var score in Scores)
             {
-                var isFilled = Value is not null && score <= Value.Value;
-                var isSelected = Value == score;
+                var isFilled = _score is not null && score <= _score.Value;
+                var isSelected = _score == score;
 
+                @* The checked star is the only way back to unrated, so it announces and tooltips
+                   what pressing it does rather than the score it already holds. Kept out of the
+                   attribute list below: a Razor comment is only a comment where content is
+                   expected, and mid-tag it is emitted as literal attribute text. *@
                 <button
                     type="button"
                     class="@(isFilled ? "score-picker__option score-picker__option--filled" : "score-picker__option")"
                     role="radio"
                     aria-checked="@isSelected"
-                    aria-label="@($"Set score to {score}")"
-                    title="@($"{score} / 10")"
+                    aria-label="@(isSelected ? "Clear score" : $"Set score to {score}")"
+                    title="@(isSelected ? "Click to clear" : $"{score} / 10")"
                     @onclick="() => SelectAsync(score)">
                     <span class="score-picker__icon"><StarIcon /></span>
                 </button>
@@ -33,33 +30,36 @@
 @code {
     private static readonly decimal[] Scores = Enumerable.Range(1, 10).Select(static value => (decimal)value).ToArray();
 
+    // Rendered from, and written by, the click handler -- never the parameter itself. Writing to
+    // a [Parameter] is unsupported: the next parent render pushes the old value straight back
+    // over it. See "Avoid overwriting parameters in ASP.NET Core Blazor".
+    private decimal? _score;
+
     [Parameter]
     public decimal? Value { get; set; }
 
     [Parameter]
     public EventCallback<decimal?> ValueChanged { get; set; }
 
-    private string CurrentValueLabel => Value is null ? "Unrated" : $"{Value.Value:0} / 10";
+    // OnParametersSet rather than OnInitialized: the same instance is reused when the details
+    // page swaps entries, and a parent that rejects an edit has to be able to pull the stars
+    // back to what it holds.
+    protected override void OnParametersSet() => _score = Value;
 
+    // Carries the toggle hint: clicking the filled star to clear is the instinct people arrive
+    // with, but nothing about ten stars advertises it, and the readout is the one line already
+    // reserved for saying what the control currently holds.
+    private string CurrentValueLabel => _score is null
+        ? "Unrated"
+        : $"{_score.Value:0} / 10 · click {_score.Value:0} again to clear";
+
+    // Selecting the score already set clears it rather than doing nothing. This is the only way
+    // back to unrated, which is why the label, the tooltip and the readout above all say so.
     private async Task SelectAsync(decimal score)
     {
-        if (Value == score)
-        {
-            return;
-        }
+        var next = _score == score ? (decimal?)null : score;
 
-        Value = score;
-        await ValueChanged.InvokeAsync(score);
-    }
-
-    private async Task ClearAsync()
-    {
-        if (Value is null)
-        {
-            return;
-        }
-
-        Value = null;
-        await ValueChanged.InvokeAsync(null);
+        _score = next;
+        await ValueChanged.InvokeAsync(next);
     }
 }

@@ -12,7 +12,7 @@
                min="0"
                aria-label="Episodes watched"
                aria-describedby="@HintId"
-               value="@Value"
+               value="@_episodes"
                @onchange="HandleManualChangeAsync" />
 
         <p class="episode-picker__hint" id="@HintId">@HintText</p>
@@ -34,15 +34,15 @@ else
              aria-label="Episodes watched"
              aria-describedby="@HintId"
              tabindex="0"
-             aria-activedescendant="@OptionId(Value)"
+             aria-activedescendant="@OptionId(_episodes)"
              @onkeydown="HandleKeyDownAsync"
              @ref="_options">
             @for (var episode = 0; episode <= Ceiling; episode++)
             {
                 var value = episode;
-                var isSelected = Value == value;
-                var isWatched = value > 0 && value <= Value;
-                var isNext = value == Value + 1 && value <= Ceiling;
+                var isSelected = _episodes == value;
+                var isWatched = value > 0 && value <= _episodes;
+                var isNext = value == _episodes + 1 && value <= Ceiling;
 
                 <button type="button"
                         id="@OptionId(value)"
@@ -73,6 +73,11 @@ else
     private int? _scrolledValue;
     private bool _skipScroll;
 
+    // Rendered from, and written by, the handlers below -- never the parameter itself. Writing to
+    // a [Parameter] is unsupported: the next parent render pushes the old value straight back
+    // over it. See "Avoid overwriting parameters in ASP.NET Core Blazor".
+    private int _episodes;
+
     [Parameter]
     public int Value { get; set; }
 
@@ -96,7 +101,7 @@ else
     // Stale rows can carry more watched episodes than the total (the total was corrected
     // downward later), so the range stretches to keep the current value selectable instead
     // of leaving nothing highlighted.
-    private int Ceiling => Math.Max(Max ?? 0, Value);
+    private int Ceiling => Math.Max(Max ?? 0, _episodes);
 
     private string HintId => $"{_idPrefix}-hint";
 
@@ -108,7 +113,7 @@ else
     {
         get
         {
-            if (Value == 0)
+            if (_episodes == 0)
             {
                 return Ceiling >= 1
                     ? "Nothing watched yet · start with episode 1"
@@ -117,22 +122,27 @@ else
 
             if (Max is not { } max)
             {
-                return $"Watched through episode {Value}";
+                return $"Watched through episode {_episodes}";
             }
 
-            if (Value > max)
+            if (_episodes > max)
             {
-                return $"Watched through episode {Value} · more than the recorded total of {max}";
+                return $"Watched through episode {_episodes} · more than the recorded total of {max}";
             }
 
-            if (Value == max)
+            if (_episodes == max)
             {
                 return max == 1 ? "Watched the only episode" : $"All {max} episodes watched";
             }
 
-            return $"Watched through episode {Value} · next up {Value + 1} · {max - Value} left";
+            return $"Watched through episode {_episodes} · next up {_episodes + 1} · {max - _episodes} left";
         }
     }
+
+    // OnParametersSet rather than OnInitialized: the same instance is reused when the details
+    // page swaps entries or the status auto-fill jumps the count to the total, and a parent that
+    // rejects an edit has to be able to pull the track back to what it holds.
+    protected override void OnParametersSet() => _episodes = Value;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -149,12 +159,12 @@ else
         var skip = _skipScroll;
         _skipScroll = false;
 
-        if (_scrolledValue == Value)
+        if (_scrolledValue == _episodes)
         {
             return;
         }
 
-        _scrolledValue = Value;
+        _scrolledValue = _episodes;
 
         if (skip)
         {
@@ -190,7 +200,7 @@ else
 
     private Task SelectAsync(int episodes)
     {
-        if (Value == episodes)
+        if (_episodes == episodes)
         {
             return Task.CompletedTask;
         }
@@ -205,21 +215,21 @@ else
     {
         var target = args.Key switch
         {
-            "ArrowLeft" => Value - 1,
-            "ArrowRight" => Value + 1,
+            "ArrowLeft" => _episodes - 1,
+            "ArrowRight" => _episodes + 1,
             "Home" => 0,
             "End" => Ceiling,
-            _ => Value
+            _ => _episodes
         };
 
         target = Math.Clamp(target, 0, Ceiling);
 
-        return target == Value ? Task.CompletedTask : SetAsync(target);
+        return target == _episodes ? Task.CompletedTask : SetAsync(target);
     }
 
     private Task HandleManualChangeAsync(ChangeEventArgs args)
     {
-        if (!int.TryParse(args.Value?.ToString(), out var episodes) || episodes < 0 || episodes == Value)
+        if (!int.TryParse(args.Value?.ToString(), out var episodes) || episodes < 0 || episodes == _episodes)
         {
             return Task.CompletedTask;
         }
@@ -229,7 +239,7 @@ else
 
     private Task SetAsync(int episodes)
     {
-        Value = episodes;
+        _episodes = episodes;
         return ValueChanged.InvokeAsync(episodes);
     }
 }

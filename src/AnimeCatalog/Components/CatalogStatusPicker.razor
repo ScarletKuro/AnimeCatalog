@@ -1,7 +1,7 @@
 <div class="status-picker" role="radiogroup" aria-label="Catalog status">
     @foreach (var status in Enum.GetValues<CatalogStatus>())
     {
-        var isSelected = Value == status;
+        var isSelected = _status == status;
 
         <button
             type="button"
@@ -15,20 +15,30 @@
 </div>
 
 @code {
+    // Rendered from, and written by, the click handler -- never the parameter itself. Writing to
+    // a [Parameter] is unsupported: the next parent render pushes the old value straight back
+    // over it. See "Avoid overwriting parameters in ASP.NET Core Blazor".
+    private CatalogStatus _status;
+
     [Parameter]
     public CatalogStatus Value { get; set; }
 
     [Parameter]
     public EventCallback<CatalogStatus> ValueChanged { get; set; }
 
+    // OnParametersSet rather than OnInitialized: the same instance is reused when the details
+    // page swaps entries, and a parent that rejects an edit has to be able to pull the selection
+    // back to what it holds.
+    protected override void OnParametersSet() => _status = Value;
+
     private async Task SelectAsync(CatalogStatus status)
     {
-        if (Value == status)
+        if (_status == status)
         {
             return;
         }
 
-        Value = status;
+        _status = status;
         await ValueChanged.InvokeAsync(status);
     }
 }

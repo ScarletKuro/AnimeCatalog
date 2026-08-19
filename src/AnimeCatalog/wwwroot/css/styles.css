@@ -2086,20 +2086,6 @@
         @apply flex flex-wrap items-center gap-3;
     }
 
-    .score-picker__clear {
-        @apply inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-sm font-semibold transition duration-150 ease-in-out;
-        color: var(--text-soft);
-        background: rgba(255, 255, 255, 0.04);
-        border-color: rgba(255, 255, 255, 0.08);
-    }
-
-    .score-picker__clear:hover,
-    .score-picker__clear--selected {
-        color: var(--text-strong);
-        border-color: rgba(158, 240, 255, 0.18);
-        background: rgba(158, 240, 255, 0.08);
-    }
-
     .score-picker__stars {
         @apply flex flex-wrap gap-1.5;
     }
