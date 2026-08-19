@@ -2689,6 +2689,12 @@
     display: grid;
     gap: calc(var(--spacing) * 2);
   }
+  .episode-picker__hint {
+    margin-bottom: 0px;
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    color: var(--text-soft);
+  }
   .episode-picker__options {
     display: grid;
     gap: var(--spacing);
@@ -2749,6 +2755,15 @@
       background-color: color-mix(in oklab, var(--color-emerald-200) 10%, transparent);
     }
     color: var(--color-emerald-50);
+  }
+  .episode-picker__option--next {
+    --tw-border-style: dashed;
+    border-style: dashed;
+    border-color: color-mix(in srgb, oklch(84.5% 0.143 164.978) 35%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-emerald-300) 35%, transparent);
+    }
+    color: var(--text-strong);
   }
   .episode-picker__option--selected {
     border-color: color-mix(in srgb, oklch(84.5% 0.143 164.978) 40%, transparent);

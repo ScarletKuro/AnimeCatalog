@@ -6,22 +6,33 @@
        enumerate. Typing stays the only honest option here rather than inventing a ceiling. *@
     @* Labelled here rather than by the host: the field's .field-label span no longer wraps the
        control, since the grid branch is a group and not a single labelable input. *@
-    <input class="text-input"
-           type="number"
-           min="0"
-           aria-label="Episodes watched"
-           value="@Value"
-           @onchange="HandleManualChangeAsync" />
+    <div class="episode-picker">
+        <input class="text-input"
+               type="number"
+               min="0"
+               aria-label="Episodes watched"
+               aria-describedby="@HintId"
+               value="@Value"
+               @onchange="HandleManualChangeAsync" />
+
+        <p class="episode-picker__hint" id="@HintId">@HintText</p>
+    </div>
 }
 else
 {
     <div class="episode-picker">
+        @* The count is a tally of finished episodes, not the episode you are on, and neither the
+           numbers nor the fill can say which of the two it is. Stated once here, and shown in
+           the track itself by the dashed cell after the selection. *@
+        <p class="episode-picker__hint" id="@HintId">@HintText</p>
+
         @* Managed focus instead of one tab stop per option: a 1000-episode entry would
            otherwise bury every control after it behind a thousand tab presses. The group
            takes the tab stop and aria-activedescendant reports which option is current. *@
         <div class="episode-picker__options"
              role="radiogroup"
              aria-label="Episodes watched"
+             aria-describedby="@HintId"
              tabindex="0"
              aria-activedescendant="@OptionId(Value)"
              @onkeydown="HandleKeyDownAsync"
@@ -31,25 +42,32 @@ else
                 var value = episode;
                 var isSelected = Value == value;
                 var isWatched = value > 0 && value <= Value;
+                var isNext = value == Value + 1 && value <= Ceiling;
 
                 <button type="button"
                         id="@OptionId(value)"
-                        class="@OptionClass(isSelected, isWatched)"
+                        class="@OptionClass(isSelected, isWatched, isNext)"
                         role="radio"
                         tabindex="-1"
                         aria-checked="@isSelected"
-                        aria-label="@(value == 0 ? "No episodes watched" : $"Set episodes watched to {value}")"
+                        aria-label="@(value == 0 ? "No episodes watched" : $"Watched through episode {value}")"
                         @onclick="() => SelectAsync(value)">
-                    @value
+                    @* "None" rather than a bare 0: beside 1, 2, 3 the digit reads as an episode
+                       number, which is the opposite of what selecting it means. *@
+                    @(value == 0 ? "None" : value.ToString())
                 </button>
             }
         </div>
 
-        <p class="episode-picker__value"><ProgressDisplay EpisodesWatched="Value" TotalEpisodes="Max" /></p>
+        @* Deliberately not ProgressDisplay: "4 / 12" is exactly the reading this field has to
+           disambiguate. The cards and lists keep it, since there the count is only reported. *@
+        <p class="episode-picker__value">@SummaryText</p>
     </div>
 }
 
 @code {
+    private const string HintText = "Pick the last episode you finished.";
+
     private readonly string _idPrefix = $"episode-picker-{Guid.NewGuid():N}";
     private ElementReference _options;
     private int? _scrolledValue;
@@ -79,6 +97,42 @@ else
     // downward later), so the range stretches to keep the current value selectable instead
     // of leaving nothing highlighted.
     private int Ceiling => Math.Max(Max ?? 0, Value);
+
+    private string HintId => $"{_idPrefix}-hint";
+
+    // Spells out what the number means, since the digit alone cannot: which episode is finished,
+    // which one is next, and how much is left. Branches on Max rather than Ceiling -- Ceiling
+    // stretches for the stale rows above, so a row holding 30 against a corrected-down total of
+    // 25 would otherwise claim every episode is watched.
+    private string SummaryText
+    {
+        get
+        {
+            if (Value == 0)
+            {
+                return Ceiling >= 1
+                    ? "Nothing watched yet · start with episode 1"
+                    : "Nothing watched yet";
+            }
+
+            if (Max is not { } max)
+            {
+                return $"Watched through episode {Value}";
+            }
+
+            if (Value > max)
+            {
+                return $"Watched through episode {Value} · more than the recorded total of {max}";
+            }
+
+            if (Value == max)
+            {
+                return max == 1 ? "Watched the only episode" : $"All {max} episodes watched";
+            }
+
+            return $"Watched through episode {Value} · next up {Value + 1} · {max - Value} left";
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -112,13 +166,18 @@ else
 
     private string OptionId(int episode) => $"{_idPrefix}-{episode}";
 
-    private static string OptionClass(bool isSelected, bool isWatched)
+    private static string OptionClass(bool isSelected, bool isWatched, bool isNext)
     {
         var classes = "episode-picker__option";
 
         if (isWatched)
         {
             classes += " episode-picker__option--watched";
+        }
+
+        if (isNext)
+        {
+            classes += " episode-picker__option--next";
         }
 
         if (isSelected)

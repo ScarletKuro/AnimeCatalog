@@ -54,7 +54,79 @@ public sealed class EpisodePickerTests
 
         Assert.Equal(7, cut.FindAll(".episode-picker__option--watched").Count);
         Assert.Single(cut.FindAll(".episode-picker__option--selected"));
-        Assert.Contains("7 / 25", cut.Markup);
+        Assert.Contains("Watched through episode 7 · next up 8 · 18 left", cut.Markup);
+    }
+
+    // The whole point of the field: "7" has to be unambiguous about whether episode 7 is done or
+    // is the one coming up. The summary says it, and the dashed cell shows it.
+    [Fact]
+    public async Task NextEpisode_IsMarkedRightAfterTheSelection()
+    {
+        await using var context = CreateContext();
+
+        var cut = context.Render<EpisodePicker>(parameters => parameters
+            .Add(p => p.Value, 4)
+            .Add(p => p.Max, 12));
+
+        var next = Assert.Single(cut.FindAll(".episode-picker__option--next"));
+        Assert.Equal("5", next.TextContent.Trim());
+        Assert.DoesNotContain("episode-picker__option--watched", next.ClassName);
+    }
+
+    [Fact]
+    public async Task FullyWatched_MarksNoNextEpisodeAndSaysSo()
+    {
+        await using var context = CreateContext();
+
+        var cut = context.Render<EpisodePicker>(parameters => parameters
+            .Add(p => p.Value, 12)
+            .Add(p => p.Max, 12));
+
+        Assert.Empty(cut.FindAll(".episode-picker__option--next"));
+        Assert.Contains("All 12 episodes watched", cut.Markup);
+    }
+
+    [Fact]
+    public async Task ZeroOption_ReadsAsNoneAndPointsAtTheFirstEpisode()
+    {
+        await using var context = CreateContext();
+
+        var cut = context.Render<EpisodePicker>(parameters => parameters
+            .Add(p => p.Value, 0)
+            .Add(p => p.Max, 12));
+
+        Assert.Equal("None", cut.FindAll(".episode-picker__option")[0].TextContent.Trim());
+        Assert.Contains("Nothing watched yet · start with episode 1", cut.Markup);
+        Assert.Equal("1", cut.Find(".episode-picker__option--next").TextContent.Trim());
+    }
+
+    // Ceiling stretches for these rows, so a Ceiling-based summary would claim the entry is
+    // finished when the recorded total says otherwise.
+    [Fact]
+    public async Task WatchedBeyondTotal_SaysTheCountOutrunsTheRecordedTotal()
+    {
+        await using var context = CreateContext();
+
+        var cut = context.Render<EpisodePicker>(parameters => parameters
+            .Add(p => p.Value, 30)
+            .Add(p => p.Max, 25));
+
+        Assert.Contains("Watched through episode 30 · more than the recorded total of 25", cut.Markup);
+        Assert.DoesNotContain("All 25 episodes watched", cut.Markup);
+    }
+
+    [Fact]
+    public async Task UnknownTotal_StillStatesWhatTheNumberMeans()
+    {
+        await using var context = CreateContext();
+
+        var cut = context.Render<EpisodePicker>(parameters => parameters
+            .Add(p => p.Value, 3)
+            .Add(p => p.Max, null));
+
+        var hint = Assert.Single(cut.FindAll(".episode-picker__hint"));
+        Assert.Equal("Pick the last episode you finished.", hint.TextContent.Trim());
+        Assert.Equal(hint.Id, cut.Find("input[type=number]").GetAttribute("aria-describedby"));
     }
 
     [Fact]

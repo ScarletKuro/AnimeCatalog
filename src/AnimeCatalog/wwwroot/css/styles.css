@@ -2136,6 +2136,13 @@
         @apply grid gap-2;
     }
 
+    /* Sits above the track: the field label says what the number is, this says what picking one
+       means. Same treatment as .franchise-picker__hint. */
+    .episode-picker__hint {
+        @apply mb-0 text-sm;
+        color: var(--text-soft);
+    }
+
     /* Same segmented track as .status-picker, for the same reason: .editor-grid gives this
        field half a row, and equal-width auto-fit cells cannot fray into ragged rows of
        capsules the way flex-wrap does. A long-running series pushes the range past a
@@ -2177,6 +2184,14 @@
        than as an isolated radio choice. Matches StatMeter's success variant on the same panel. */
     .episode-picker__option--watched {
         @apply border-emerald-300/20 bg-emerald-200/10 text-emerald-50;
+    }
+
+    /* The episode after the selection: outlined, never filled. Fill means done, so the boundary
+       between watched and not is legible as shape and not only as colour. Declared after
+       --watched and before --selected so the selected cell always wins the border. */
+    .episode-picker__option--next {
+        @apply border-dashed border-emerald-300/35;
+        color: var(--text-strong);
     }
 
     .episode-picker__option--selected {
