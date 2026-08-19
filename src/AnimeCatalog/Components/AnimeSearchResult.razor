@@ -35,7 +35,7 @@
 
 @code {
     [Parameter, EditorRequired]
-    public required AnimeCatalog.Models.AniList.AniListMedia Media { get; set; }
+    public required Models.AniList.AniListMedia Media { get; set; }
 
     [Parameter]
     public bool IsSelected { get; set; }
@@ -48,7 +48,7 @@
     public long? ExistingAnimeEntryId { get; set; }
 
     [Parameter]
-    public EventCallback<AnimeCatalog.Models.AniList.AniListMedia> OnSelected { get; set; }
+    public EventCallback<Models.AniList.AniListMedia> OnSelected { get; set; }
 
     private bool IsInCatalog => ExistingAnimeEntryId is not null;
 

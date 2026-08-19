@@ -106,11 +106,9 @@
                                 <span class="field-label">Status</span>
                                 <CatalogStatusPicker Value="_editStatus" ValueChanged="HandleStatusChangedAsync" />
                             </div>
-                            <div class="field">
-                                <span class="field-label">Score</span>
-                                <ScorePicker Value="_editScore" ValueChanged="HandleScoreChangedAsync" />
-                            </div>
-                            @* The StatMeter below is the readout, so a Completed entry drops the
+                            @* Directly under Status: the two are coupled -- Completed fills the
+                               count in, and picking the last episode marks the entry Completed.
+                               The StatMeter below is the readout, so a Completed entry drops the
                                field entirely instead of repeating the same count twice. *@
                             @if (EpisodePicker.IsEditable(_editStatus, _details.AnimeEntry.Episodes))
                             {
@@ -121,6 +119,10 @@
                                                    ValueChanged="HandleEpisodesChangedAsync" />
                                 </div>
                             }
+                            <div class="field">
+                                <span class="field-label">Score</span>
+                                <ScorePicker Value="_editScore" ValueChanged="HandleScoreChangedAsync" />
+                            </div>
 
                             <div class="field field--centered">
                                 <div class="button-row">
@@ -561,7 +563,9 @@
         _hasPendingEdits = false;
     }
 
-    // Mirrors AnimeEditorForm.HandleStatusChangedAsync so both editors behave identically.
+    // Shares EpisodePicker.ReconcileWatchedCount with AnimeEditorForm rather than restating the
+    // rule, so the two editors cannot drift apart. The total is not editable here, so unlike the
+    // form there is no second caller.
     private Task HandleStatusChangedAsync(CatalogStatus status)
     {
         if (_editStatus == status)
@@ -570,11 +574,10 @@
         }
 
         _editStatus = status;
-
-        if (status == CatalogStatus.Completed && _details?.AnimeEntry.Episodes is { } episodes)
-        {
-            _editEpisodesWatched = episodes;
-        }
+        _editEpisodesWatched = EpisodePicker.ReconcileWatchedCount(
+            _editEpisodesWatched,
+            status,
+            _details?.AnimeEntry.Episodes);
 
         _hasPendingEdits = true;
         _saveFeedback = null;
@@ -602,6 +605,12 @@
         }
 
         _editEpisodesWatched = episodes;
+
+        // Reaching the last episode is what finishing a show means, so the picker promotes the
+        // entry rather than leaving a count that contradicts the status. IsEditable then puts the
+        // field away and the StatMeter below carries the count on its own.
+        _editStatus = EpisodePicker.ReconcileStatus(episodes, _editStatus, _details?.AnimeEntry.Episodes);
+
         _hasPendingEdits = true;
         _saveFeedback = null;
         return Task.CompletedTask;

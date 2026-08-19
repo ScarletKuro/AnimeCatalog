@@ -17,7 +17,7 @@
             <label class="field"><span class="field-label">Format</span><input class="text-input" @bind="Model.Format" /></label>
             <label class="field"><span class="field-label">Season</span><input class="text-input" @bind="Model.Season" /></label>
             <label class="field"><span class="field-label">Year</span><InputNumber class="text-input" @bind-Value="Model.SeasonYear" /></label>
-            <label class="field"><span class="field-label">Episodes</span><InputNumber class="text-input" @bind-Value="Model.Episodes" @bind-Value:after="SyncWatchedToTotalWhenCompleted" min="0" /></label>
+            <label class="field"><span class="field-label">Episodes</span><InputNumber class="text-input" @bind-Value="Model.Episodes" @bind-Value:after="SyncWatchedToTotal" min="0" /></label>
             <label class="field"><span class="field-label">Display order</span><InputNumber class="text-input" @bind-Value="Model.DisplayOrder" /></label>
             @* These three are segmented tracks rather than single inputs, so a half-row column
                squeezes their cells to the minimum and frays them into several short rows. Given
@@ -26,21 +26,23 @@
                 <span class="field-label">Status</span>
                 <CatalogStatusPicker Value="Model.Status" ValueChanged="HandleStatusChangedAsync" />
             </div>
-            <div class="field field--wide">
-                <span class="field-label">Score</span>
-                <ScorePicker @bind-Value="Model.Score" />
-            </div>
-            @* Completed plus the Episodes field above already say the count; SyncWatchedToTotalWhenCompleted
-               keeps the model matching them while the field is gone. *@
+            @* Directly under Status: the two are coupled -- Completed fills the count in, and
+               picking the last episode marks the entry Completed. Completed plus the Episodes
+               field above already say the count, so the field goes; SyncWatchedToTotal keeps the
+               model matching them while it is gone. *@
             @if (EpisodePicker.IsEditable(Model.Status, Model.Episodes))
             {
                 <div class="field field--wide">
                     <span class="field-label">Episodes watched</span>
                     <EpisodePicker Value="Model.EpisodesWatched"
                                    Max="Model.Episodes"
-                                   ValueChanged="episodes => Model.EpisodesWatched = episodes" />
+                                   ValueChanged="HandleEpisodesChangedAsync" />
                 </div>
             }
+            <div class="field field--wide">
+                <span class="field-label">Score</span>
+                <ScorePicker @bind-Value="Model.Score" />
+            </div>
             <label class="field field--wide"><span class="field-label">Cover URL</span><input class="text-input" @bind="Model.CoverUrl" /></label>
             <label class="field field--wide"><span class="field-label">Notes</span><InputTextArea class="text-area" @bind-Value="Model.Notes" /></label>
         </div>
@@ -164,25 +166,30 @@
         }
 
         Model.Status = status;
-
-        if (status == CatalogStatus.Completed && Model.Episodes is not null)
-        {
-            Model.EpisodesWatched = Model.Episodes.Value;
-        }
+        SyncWatchedToTotal();
 
         return Task.CompletedTask;
     }
 
-    // The total is editable on this form, so correcting it after picking Completed has to drag
-    // the watched count along. Nothing else would: the picker offers no range while Completed,
-    // and HandleStatusChangedAsync only fires when the status itself changes.
-    private void SyncWatchedToTotalWhenCompleted()
+    // Reaching the last episode is what finishing a show means, so the picker promotes the entry
+    // rather than leaving a count that contradicts the status. The field then puts itself away,
+    // since a Completed entry states its count through the Episodes field above.
+    private Task HandleEpisodesChangedAsync(int episodes)
     {
-        if (Model.Status == CatalogStatus.Completed && Model.Episodes is { } episodes)
-        {
-            Model.EpisodesWatched = episodes;
-        }
+        Model.EpisodesWatched = episodes;
+        Model.Status = EpisodePicker.ReconcileStatus(episodes, Model.Status, Model.Episodes);
+
+        return Task.CompletedTask;
     }
+
+    // Both the status picker and the editable total feed this: either can put the two fields out
+    // of step, and nothing else would catch the drift -- the picker offers no range at all while
+    // Completed.
+    private void SyncWatchedToTotal() =>
+        Model.EpisodesWatched = EpisodePicker.ReconcileWatchedCount(
+            Model.EpisodesWatched,
+            Model.Status,
+            Model.Episodes);
 
     private void HandleFranchiseAssignmentModeChanged(ChangeEventArgs args)
     {

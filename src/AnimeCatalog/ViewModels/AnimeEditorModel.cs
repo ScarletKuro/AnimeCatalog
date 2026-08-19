@@ -53,6 +53,16 @@ public sealed class AnimeEditorModel : IValidatableObject
             yield return new ValidationResult("Episodes watched cannot exceed the total episode count.", [nameof(EpisodesWatched)]);
         }
 
+        // Watching every episode is what Completed means, so the two cannot disagree. Picking the
+        // last episode promotes the status, so the UI cannot produce this -- it catches rows saved
+        // before that rule, and makes one of the two give way on the way out.
+        if (Episodes is not null && Status != CatalogStatus.Completed && EpisodesWatched == Episodes.Value)
+        {
+            yield return new ValidationResult(
+                "Every episode is watched, so the status should be Completed.",
+                [nameof(EpisodesWatched)]);
+        }
+
         if (FranchiseAssignmentMode == FranchiseAssignmentMode.CreateNew &&
             string.IsNullOrWhiteSpace(NewFranchiseTitle))
         {

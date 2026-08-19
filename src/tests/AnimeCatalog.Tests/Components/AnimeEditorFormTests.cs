@@ -29,8 +29,10 @@ public sealed class AnimeEditorFormTests
         Assert.Equal(CatalogStatus.Completed, model.Status);
     }
 
+    // Every episode watched is what Completed means, so leaving it cannot leave the count on the
+    // total -- the entry would claim you are still working through a show you have finished.
     [Fact]
-    public async Task SwitchingAwayFromCompleted_DoesNotEraseProgress()
+    public async Task SwitchingAwayFromCompleted_StepsTheCountOffTheTotal()
     {
         await using var context = CreateContext();
         var model = CreateModel();
@@ -39,15 +41,50 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        cut.FindAll(".status-picker__option")
-            .Single(button => button.TextContent.Contains("Completed", StringComparison.Ordinal))
-            .Click();
-        cut.FindAll(".status-picker__option")
-            .Single(button => button.TextContent.Contains("Watching", StringComparison.Ordinal))
-            .Click();
-
+        Status(cut, "Completed").Click();
         Assert.Equal(25, model.EpisodesWatched);
+
+        Status(cut, "Watching").Click();
+
+        Assert.Equal(24, model.EpisodesWatched);
         Assert.Equal(CatalogStatus.Watching, model.Status);
+    }
+
+    [Theory]
+    [InlineData("Planned")]
+    [InlineData("On Hold")]
+    [InlineData("Dropped")]
+    public async Task SwitchingFromCompletedToAnyOtherStatus_StepsTheCountOffTheTotal(string label)
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        Status(cut, "Completed").Click();
+        Status(cut, label).Click();
+
+        Assert.Equal(24, model.EpisodesWatched);
+    }
+
+    // Clamp, never assign: the step-off must not invent progress for an entry that had none.
+    [Fact]
+    public async Task SwitchingAwayFromCompleted_LeavesACountBelowTheTotalAlone()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+        model.Status = CatalogStatus.Completed;
+        model.EpisodesWatched = 0;
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        Status(cut, "Watching").Click();
+
+        Assert.Equal(0, model.EpisodesWatched);
     }
 
     [Fact]
@@ -97,6 +134,89 @@ public sealed class AnimeEditorFormTests
 
         Assert.Equal(26, model.Episodes);
         Assert.Equal(26, model.EpisodesWatched);
+    }
+
+    // The same handler runs while not Completed, where it has to clamp instead of follow: the
+    // picker stops one short of the total, so a corrected-down total drags the count with it.
+    [Fact]
+    public async Task CorrectingTotalEpisodesWhileWatching_ClampsWatchedBelowTheNewTotal()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+        model.Status = CatalogStatus.Watching;
+        model.EpisodesWatched = 20;
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        cut.FindAll("input[type=number]")
+            .First(input => input.GetAttribute("value") == "25")
+            .Change("12");
+
+        Assert.Equal(12, model.Episodes);
+        Assert.Equal(11, model.EpisodesWatched);
+    }
+
+    // The loop the coupling has to close: finishing the last episode marks the entry Completed and
+    // puts the field away, and coming back out steps the count off the total so the two never
+    // disagree in either direction.
+    [Fact]
+    public async Task PickingTheLastEpisode_CompletesTheEntryAndHidesTheField()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+        model.Status = CatalogStatus.Watching;
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        cut.FindAll(".episode-picker__option")[^1].Click();
+
+        Assert.Equal(25, model.EpisodesWatched);
+        Assert.Equal(CatalogStatus.Completed, model.Status);
+        Assert.Empty(cut.FindAll(".episode-picker__option"));
+
+        Status(cut, "Watching").Click();
+
+        Assert.Equal(24, model.EpisodesWatched);
+        Assert.NotEmpty(cut.FindAll(".episode-picker__option"));
+    }
+
+    [Fact]
+    public async Task PickingAnyOtherEpisode_LeavesTheStatusAlone()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+        model.Status = CatalogStatus.Watching;
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        cut.FindAll(".episode-picker__option")[24].Click();
+
+        Assert.Equal(24, model.EpisodesWatched);
+        Assert.Equal(CatalogStatus.Watching, model.Status);
+    }
+
+    // Status sits directly above the count it is coupled to, and the score follows both.
+    [Fact]
+    public async Task EntryDetails_OrdersStatusThenEpisodesWatchedThenScore()
+    {
+        await using var context = CreateContext();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, CreateModel())
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        var markup = cut.Markup;
+
+        Assert.True(markup.IndexOf("status-picker", StringComparison.Ordinal)
+            < markup.IndexOf("episode-picker", StringComparison.Ordinal));
+        Assert.True(markup.IndexOf("episode-picker", StringComparison.Ordinal)
+            < markup.IndexOf("score-picker", StringComparison.Ordinal));
     }
 
     [Fact]

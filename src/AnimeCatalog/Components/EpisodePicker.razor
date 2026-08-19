@@ -98,6 +98,44 @@ else
     public static bool IsEditable(CatalogStatus status, int? max) =>
         status != CatalogStatus.Completed || max is null;
 
+    /// <summary>
+    /// The status implied by the watched count. Reaching the last episode is what finishing a
+    /// show means, so selecting it promotes the entry instead of leaving a count that contradicts
+    /// the status. Every other count leaves the status alone.
+    /// </summary>
+    /// <remarks>
+    /// Hosts call this from the picker's ValueChanged. Paired with <see cref="IsEditable"/> the
+    /// promotion also puts the field away, since a Completed entry states its count elsewhere.
+    /// </remarks>
+    public static CatalogStatus ReconcileStatus(int episodesWatched, CatalogStatus status, int? max) =>
+        max is { } total && total > 0 && episodesWatched >= total
+            ? CatalogStatus.Completed
+            : status;
+
+    /// <summary>
+    /// The watched count a status and total agree on. Completed means every episode, so anything
+    /// else means not every episode -- the count cannot sit on the total while the status says
+    /// you are still going. Both editors call this instead of mirroring the rule by hand.
+    /// </summary>
+    /// <remarks>
+    /// A pure function of the three values rather than of what changed, so it also fixes a row
+    /// that was already inconsistent when it loaded, and it serves the editor form's total field
+    /// as well as its status picker. Clamps rather than assigns, so it can only ever lower a
+    /// count: a draft seeded Completed with nothing watched keeps its zero on the way out. An
+    /// unknown total has nothing to measure against and is returned untouched.
+    /// </remarks>
+    public static int ReconcileWatchedCount(int episodesWatched, CatalogStatus status, int? max)
+    {
+        if (max is not { } total)
+        {
+            return episodesWatched;
+        }
+
+        return status == CatalogStatus.Completed
+            ? total
+            : Math.Clamp(episodesWatched, 0, Math.Max(0, total - 1));
+    }
+
     // Stale rows can carry more watched episodes than the total (the total was corrected
     // downward later), so the range stretches to keep the current value selectable instead
     // of leaving nothing highlighted.
@@ -130,9 +168,14 @@ else
                 return $"Watched through episode {_episodes} · more than the recorded total of {max}";
             }
 
+            // Selecting the last episode marks the entry Completed and puts this field away, so a
+            // visible track sitting on the total is a row that predates that rule. The readout
+            // names the fix rather than reporting the contradiction as ordinary progress.
             if (_episodes == max)
             {
-                return max == 1 ? "Watched the only episode" : $"All {max} episodes watched";
+                return max == 1
+                    ? "The only episode is watched · set the status to Completed"
+                    : $"All {max} watched · set the status to Completed";
             }
 
             return $"Watched through episode {_episodes} · next up {_episodes + 1} · {max - _episodes} left";

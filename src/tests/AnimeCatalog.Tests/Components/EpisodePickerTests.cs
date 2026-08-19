@@ -73,8 +73,31 @@ public sealed class EpisodePickerTests
         Assert.DoesNotContain("episode-picker__option--watched", next.ClassName);
     }
 
+    // The last episode is on offer -- selecting it is how an entry becomes Completed. Hosts react
+    // to the emitted count; the picker itself just reports it.
     [Fact]
-    public async Task FullyWatched_MarksNoNextEpisodeAndSaysSo()
+    public async Task LastEpisode_IsOfferedAndEmitsTheTotal()
+    {
+        await using var context = CreateContext();
+
+        var selected = -1;
+        var cut = context.Render<EpisodePicker>(parameters => parameters
+            .Add(p => p.Value, 4)
+            .Add(p => p.Max, 12)
+            .Add(p => p.ValueChanged, value => selected = value));
+
+        var options = cut.FindAll(".episode-picker__option");
+        Assert.Equal("12", options[^1].TextContent.Trim());
+
+        options[^1].Click();
+
+        Assert.Equal(12, selected);
+    }
+
+    // Selecting the last episode marks the entry Completed and puts the field away, so a visible
+    // track sitting on the total is a row that predates that rule. The readout names the fix.
+    [Fact]
+    public async Task WatchedTheTotal_AsksForCompleted()
     {
         await using var context = CreateContext();
 
@@ -83,7 +106,29 @@ public sealed class EpisodePickerTests
             .Add(p => p.Max, 12));
 
         Assert.Empty(cut.FindAll(".episode-picker__option--next"));
-        Assert.Contains("All 12 episodes watched", cut.Markup);
+        Assert.Equal("12", cut.Find(".episode-picker__option--selected").TextContent.Trim());
+        Assert.Contains("All 12 watched · set the status to Completed", cut.Markup);
+    }
+
+    // The rule both editors share for the count -> status direction.
+    [Theory]
+    // The last episode finishes the show, whatever the status said before.
+    [InlineData(12, CatalogStatus.Watching, 12, CatalogStatus.Completed)]
+    [InlineData(12, CatalogStatus.Planned, 12, CatalogStatus.Completed)]
+    [InlineData(12, CatalogStatus.OnHold, 12, CatalogStatus.Completed)]
+    [InlineData(12, CatalogStatus.Dropped, 12, CatalogStatus.Completed)]
+    // A stale row already past the total is finished too.
+    [InlineData(30, CatalogStatus.Watching, 25, CatalogStatus.Completed)]
+    // Anything short of the total leaves the status alone.
+    [InlineData(11, CatalogStatus.Watching, 12, CatalogStatus.Watching)]
+    [InlineData(0, CatalogStatus.Planned, 12, CatalogStatus.Planned)]
+    // No total to reach, so nothing to promote -- an airing show never finishes itself.
+    [InlineData(999, CatalogStatus.Watching, null, CatalogStatus.Watching)]
+    [InlineData(0, CatalogStatus.Watching, 0, CatalogStatus.Watching)]
+    public void ReconcileStatus_PromotesOnlyOnTheLastEpisode(
+        int watched, CatalogStatus status, int? max, CatalogStatus expected)
+    {
+        Assert.Equal(expected, EpisodePicker.ReconcileStatus(watched, status, max));
     }
 
     [Fact]
@@ -202,6 +247,34 @@ public sealed class EpisodePickerTests
 
         atEnd.Find(".episode-picker__options").KeyDown("ArrowRight");
         Assert.Equal(-1, selected);
+    }
+
+    // The rule both editors share. AnimeDetails calls this and nothing else for the coupling, so
+    // covering it here covers the page handler that has no harness of its own.
+    [Theory]
+    // Completed means every episode, whatever the count was.
+    [InlineData(0, CatalogStatus.Completed, 25, 25)]
+    [InlineData(7, CatalogStatus.Completed, 25, 25)]
+    // Anything else means not every episode, so the count steps off the total.
+    [InlineData(25, CatalogStatus.Watching, 25, 24)]
+    [InlineData(25, CatalogStatus.Planned, 25, 24)]
+    [InlineData(25, CatalogStatus.OnHold, 25, 24)]
+    [InlineData(25, CatalogStatus.Dropped, 25, 24)]
+    // Clamp, never raise: a count already below the total is left where it is.
+    [InlineData(0, CatalogStatus.Watching, 25, 0)]
+    [InlineData(7, CatalogStatus.Watching, 25, 7)]
+    // A stale row whose total was corrected downward comes back inside the range.
+    [InlineData(30, CatalogStatus.Watching, 25, 24)]
+    // No total to measure against, so nothing to reconcile.
+    [InlineData(999, CatalogStatus.Watching, null, 999)]
+    [InlineData(0, CatalogStatus.Completed, null, 0)]
+    // A single-episode entry has no room below the total.
+    [InlineData(1, CatalogStatus.Watching, 1, 0)]
+    [InlineData(3, CatalogStatus.Watching, 0, 0)]
+    public void ReconcileWatchedCount_KeepsTheStatusAndTheCountAgreeing(
+        int watched, CatalogStatus status, int? max, int expected)
+    {
+        Assert.Equal(expected, EpisodePicker.ReconcileWatchedCount(watched, status, max));
     }
 
     [Theory]
