@@ -47,7 +47,7 @@
 
         @if (_feedback is not null)
         {
-            <p class="@FeedbackClass" role="status">@_feedback.Message</p>
+            <p class="@_feedback.CssClass" role="status">@_feedback.Message</p>
         }
     </div>
 </section>
@@ -62,7 +62,7 @@
 @code {
     private bool _isSaving;
     private bool _showPublicConfirm;
-    private Feedback? _feedback;
+    private ActionFeedback? _feedback;
 
     [Parameter]
     public bool Enabled { get; set; }
@@ -73,10 +73,6 @@
     private string SwitchClass => Enabled
         ? "visibility-switch visibility-switch--public"
         : "visibility-switch visibility-switch--private";
-
-    private string FeedbackClass => _feedback?.IsError == true
-        ? "visibility-feedback visibility-feedback--error"
-        : "visibility-feedback";
 
     private string Description => Enabled
         ? "Anyone with the publishable key can read the catalog anonymously. Admin-only writes still remain protected by RLS."
@@ -130,19 +126,16 @@
             _feedback = null;
             await CatalogAccessService.SetPublicCatalogEnabledAsync(enabled);
             await EnabledChanged.InvokeAsync(enabled);
-            _feedback = new Feedback(
-                enabled ? "Public catalog access enabled." : "Public catalog access disabled.",
-                IsError: false);
+            _feedback = ActionFeedback.Success(
+                enabled ? "Public catalog access enabled." : "Public catalog access disabled.");
         }
         catch (Exception ex)
         {
-            _feedback = new Feedback(ex.Message, IsError: true);
+            _feedback = ActionFeedback.Error(ex.Message);
         }
         finally
         {
             _isSaving = false;
         }
     }
-
-    private sealed record Feedback(string Message, bool IsError);
 }

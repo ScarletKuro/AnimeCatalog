@@ -26,7 +26,7 @@
            another" would look indistinguishable from the form silently resetting itself. *@
         @if (_lastSaved is not null)
         {
-            <p class="admin-add-feedback" role="status">
+            <p class="action-feedback action-feedback--success" role="status">
                 <span>Saved <strong>@_lastSaved.Title</strong>. Search the next title below.</span>
                 <NavLink href="@($"anime/{_lastSaved.Id}")" class="button button--inline">Open entry</NavLink>
             </p>

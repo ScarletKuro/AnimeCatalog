@@ -126,8 +126,8 @@ public sealed class CatalogVisibilityPanelTests
 
         cut.WaitForAssertion(() =>
         {
-            var feedback = cut.Find(".visibility-feedback");
-            Assert.Contains("visibility-feedback--error", feedback.ClassList);
+            var feedback = cut.Find(".action-feedback");
+            Assert.Contains("action-feedback--error", feedback.ClassList);
             Assert.Contains("Admin access is required.", feedback.TextContent);
         });
 

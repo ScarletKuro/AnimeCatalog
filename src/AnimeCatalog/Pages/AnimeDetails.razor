@@ -117,16 +117,18 @@
                                 </div>
                             }
 
-                            <div class="button-row">
-                                <button type="button"
-                                        class="button button--primary"
-                                        disabled="@(!_hasPendingEdits || _isSaving)"
-                                        @onclick="SaveCatalogEntryAsync">
-                                    @(_isSaving ? "Saving..." : "Save changes")
-                                </button>
-                                @if (_saveMessage is not null)
+                            <div class="field field--centered">
+                                <div class="button-row">
+                                    <button type="button"
+                                            class="button button--primary"
+                                            disabled="@(!_hasPendingEdits || _isSaving)"
+                                            @onclick="SaveCatalogEntryAsync">
+                                        @(_isSaving ? "Saving..." : "Save changes")
+                                    </button>
+                                </div>
+                                @if (_saveFeedback is not null)
                                 {
-                                    <span class="empty-note">@_saveMessage</span>
+                                    <p class="@_saveFeedback.CssClass" role="status">@_saveFeedback.Message</p>
                                 }
                             </div>
                         }
@@ -373,7 +375,7 @@
     private int _editEpisodesWatched;
     private bool _hasPendingEdits;
     private bool _isSaving;
-    private string? _saveMessage;
+    private ActionFeedback? _saveFeedback;
 
     protected override Task OnParametersSetAsync() => LoadAsync();
 
@@ -398,7 +400,7 @@
             _error = null;
             _enrichment = null;
             _enrichError = null;
-            _saveMessage = null;
+            _saveFeedback = null;
             _showSpoilerTags = false;
             ResetChips();
             _details = await CatalogService.GetAnimeDetailsAsync(Id, token);
@@ -565,7 +567,7 @@
         }
 
         _hasPendingEdits = true;
-        _saveMessage = null;
+        _saveFeedback = null;
         return Task.CompletedTask;
     }
 
@@ -578,7 +580,7 @@
 
         _editScore = score;
         _hasPendingEdits = true;
-        _saveMessage = null;
+        _saveFeedback = null;
         return Task.CompletedTask;
     }
 
@@ -591,7 +593,7 @@
 
         _editEpisodesWatched = episodes;
         _hasPendingEdits = true;
-        _saveMessage = null;
+        _saveFeedback = null;
         return Task.CompletedTask;
     }
 
@@ -605,7 +607,7 @@
         try
         {
             _isSaving = true;
-            _saveMessage = null;
+            _saveFeedback = null;
             await AdminCatalogService.UpdateCatalogEntryAsync(
                 _details.AnimeEntry.Id,
                 _editStatus,
@@ -613,11 +615,11 @@
                 _editEpisodesWatched);
 
             await LoadAsync();
-            _saveMessage = "Saved.";
+            _saveFeedback = ActionFeedback.Success("Saved");
         }
         catch (Exception ex)
         {
-            _saveMessage = ex.Message;
+            _saveFeedback = ActionFeedback.Error(ex.Message);
         }
         finally
         {

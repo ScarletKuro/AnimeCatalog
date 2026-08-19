@@ -6,18 +6,13 @@
 
 <section class="stack">
     @* The header and its h1 stay outside every state branch: Routes.razor focuses the h1 after
-       navigation, so it has to exist while loading and while access is refused. The action link
-       does not - anonymous visitors must not see a route they cannot open. *@
+       navigation, so it has to exist while loading and while access is refused. *@
     <div class="page-header">
         <div>
             <p class="eyebrow">Admin</p>
             <h1>Catalog maintenance</h1>
             <p class="lede">Search AniList, add new entries, adjust franchise grouping, and keep cached metadata current.</p>
         </div>
-        @if (AuthService.IsAdmin)
-        {
-            <NavLink href="admin/add" class="button button--primary">Add anime</NavLink>
-        }
     </div>
 
     @if (!AuthService.IsAuthenticated)

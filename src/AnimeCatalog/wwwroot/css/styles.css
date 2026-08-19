@@ -1050,13 +1050,6 @@
         border-color: rgba(158, 240, 255, 0.14);
     }
 
-    /* A save that stays on the page has no navigation to confirm it, so this line is the whole
-       receipt. Sized as a note, not a panel, because it reappears on every add. */
-    .admin-add-feedback {
-        @apply m-0 flex flex-wrap items-center gap-3 text-sm;
-        color: var(--text-soft);
-    }
-
     .admin-add-workspace {
         @apply grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)];
         align-items: start;
@@ -1139,6 +1132,18 @@
         grid-column: 1 / -1;
     }
 
+    /* A button and its .action-feedback centered as a pair. Both children shrink to their own
+       width, so the receipt sits under the button's label instead of starting at the panel's
+       left edge, a button's worth of padding away from the word it is confirming. */
+    .field--centered {
+        justify-items: center;
+        text-align: center;
+    }
+
+    .field--centered .action-feedback {
+        @apply justify-center;
+    }
+
     .field-label {
         @apply text-sm;
         color: var(--text-soft);
@@ -1190,6 +1195,27 @@
         border-color: rgba(243, 207, 133, 0.2);
         background: rgba(243, 207, 133, 0.08);
         color: var(--warning);
+    }
+
+    /* One-line receipt for an action that stayed on the page: a save with no navigation to
+       confirm it, a visibility toggle that flipped. It sits under the button it belongs to
+       rather than beside it - in a flex row a long error message shoves the button around.
+
+       Deliberately below .field-label's text-sm. At the same size and the same --text-soft it
+       was indistinguishable from the field labels stacked above it, so the receipt read as one
+       more label rather than as an answer to the click. Colour carries the outcome: muted is
+       only the neutral base, and every caller is expected to pick a variant. */
+    .action-feedback {
+        @apply m-0 flex flex-wrap items-center gap-2 text-[0.78rem];
+        color: var(--text-soft);
+    }
+
+    .action-feedback--success {
+        color: var(--success);
+    }
+
+    .action-feedback--error {
+        color: var(--danger);
     }
 
     /* Thin themed scrollbar, shared by the admin search results and the franchise card's overlay
@@ -2496,15 +2522,6 @@
     .visibility-switch--public .visibility-switch__thumb {
         background: var(--success);
         translate: 1.275rem;
-    }
-
-    .visibility-feedback {
-        @apply m-0 flex flex-wrap items-center gap-2 text-sm;
-        color: var(--text-soft);
-    }
-
-    .visibility-feedback--error {
-        color: var(--danger);
     }
 
     .loading-card {

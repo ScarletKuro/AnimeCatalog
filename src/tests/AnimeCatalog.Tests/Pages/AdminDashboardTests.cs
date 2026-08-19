@@ -13,7 +13,7 @@ namespace AnimeCatalog.Tests.Pages;
 public sealed class AdminDashboardTests
 {
     [Fact]
-    public void AnonymousVisitor_SeesNoRouteIntoTheAdminEditor()
+    public void AnonymousVisitor_SeesNoAdminPanels()
     {
         using var context = CreateContext();
 
@@ -22,8 +22,8 @@ public sealed class AdminDashboardTests
         cut.WaitForAssertion(() =>
         {
             Assert.Contains("Authentication required", cut.Markup);
-            Assert.DoesNotContain("admin/add", cut.Markup);
-            Assert.DoesNotContain("Add anime", cut.Markup);
+            Assert.DoesNotContain("Catalog visibility", cut.Markup);
+            Assert.DoesNotContain("Backup and restore", cut.Markup);
         });
     }
 
