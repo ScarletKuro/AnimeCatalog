@@ -484,7 +484,6 @@
     .error-card,
     .loading-card,
     .empty-card,
-    .stat-card,
     .notfound-card,
     .access-card,
     .home-spotlight,
@@ -611,36 +610,49 @@
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     }
 
+    /* Small metric tiles, deliberately NOT in the big-card group above: at a 180px min
+       column they are only ~90px tall, and --radius-xl (30px) is wider than their own
+       p-5 padding, so the corner curve cuts into the content box. Radius stays <= padding.
+       Surface, inset top highlight and soft shadow are the .franchise-card / .poster-card
+       recipe scaled down; the accent is the corner-glow motif of .hero-card and
+       .panel--feature. That inset highlight is what replaces the old 3px ::after bar: a
+       positioned strip cannot follow a rounded corner, so the radius clipped its ends and
+       it read as a flat lid floating above the corners. */
     .stat-card {
-        @apply relative overflow-hidden p-5;
+        @apply grid content-start gap-2 rounded-[var(--radius-md)] border p-5;
+        border-color: var(--panel-border);
         background:
-            linear-gradient(180deg, rgba(17, 26, 44, 0.92), rgba(11, 18, 31, 0.76));
-        transition: transform 160ms ease, border-color 160ms ease;
+            radial-gradient(120% 140% at 100% 0%, rgba(158, 240, 255, 0.1), transparent 58%),
+            linear-gradient(180deg, rgba(18, 28, 47, 0.98), rgba(11, 18, 31, 0.94));
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.05),
+            var(--shadow-soft);
+        transition: border-color 160ms ease, box-shadow 160ms ease;
     }
 
-    .stat-card::after {
-        content: "";
-        position: absolute;
-        inset: 0 auto auto 0;
-        width: 100%;
-        height: 3px;
-        background: linear-gradient(90deg, #9ef0ff, #f5e598, transparent);
-        opacity: 0.9;
-    }
-
+    /* No lift on hover: unlike the media cards these tiles are not links, so a lift would
+       promise a click that does not exist. Hover only firms the edge. */
     .stat-card:hover {
-        transform: translateY(-2px);
-        border-color: rgba(158, 240, 255, 0.18);
+        border-color: rgba(158, 240, 255, 0.28);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.08),
+            var(--shadow-soft);
     }
 
+    /* Micro-caps label, same treatment as .score-split__label. This carries the visual
+       rhythm the old gradient stripe was there to supply. */
     .stat-card span {
-        @apply block text-sm;
+        @apply text-[0.68rem] font-bold uppercase tracking-[0.18em];
         color: var(--text-soft);
     }
 
+    /* Proportional figures on purpose. .score-split__value sets tabular-nums because it
+       aligns two cells in a column; here every digit getting a 0's width just reads loose
+       at 1.9rem. */
     .stat-card strong {
-        @apply mt-2 block text-[1.75rem];
+        @apply text-[1.9rem] font-extrabold leading-none;
         color: var(--text-strong);
+        letter-spacing: -0.02em;
     }
 
     .content-grid {
@@ -3229,8 +3241,7 @@
     .franchise-card:hover,
     .franchise-card:focus-within,
     .poster-card:hover,
-    .poster-card:focus-within,
-    .stat-card:hover {
+    .poster-card:focus-within {
         transform: none;
     }
 
