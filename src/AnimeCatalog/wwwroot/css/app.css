@@ -55,7 +55,6 @@
     --radius-md: 0.375rem;
     --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
-    --radius-2xl: 1rem;
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
     --default-transition-duration: 150ms;
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -413,14 +412,14 @@
     gap: calc(var(--spacing) * 3);
   }
   .site-brand__mark, .login-card__mark {
-    background: radial-gradient(circle at 28% 25%, rgba(255, 255, 255, 0.85), transparent 24%), linear-gradient(135deg, #9ef0ff 0%, #6cd2ff 42%, #f5e598 100%);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 14px 30px rgba(73, 190, 255, 0.22);
+    display: block;
+    background: center / contain no-repeat url("../img/slime.png");
+    filter: drop-shadow(0 6px 14px rgba(73, 190, 255, 0.3));
   }
   .site-brand__mark {
-    display: block;
     height: calc(var(--spacing) * 9);
-    width: calc(var(--spacing) * 9);
-    border-radius: var(--radius-2xl);
+    width: 3.7rem;
+    flex-shrink: 0;
   }
   .site-brand__title {
     font-size: 0.98rem;
@@ -3062,10 +3061,8 @@
     animation: loading-glow 3.6s ease-in-out infinite;
   }
   .login-card__mark {
-    display: block;
     height: calc(var(--spacing) * 14);
-    width: calc(var(--spacing) * 14);
-    border-radius: 1.1rem;
+    width: 5.72rem;
   }
   .login-card .eyebrow {
     margin-bottom: 0px;
