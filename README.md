@@ -1,6 +1,40 @@
 # Anime Catalog
 
-Public, franchise-aware anime catalog built with `.NET 10`, `Blazor WebAssembly Standalone`, `Supabase`, and `AniList`.
+A personal anime watch list: track what you have **watched**, what you are
+**watching**, what is **planned**, plus what you put **on hold** or **dropped**.
+Each entry keeps its own progress — episodes watched, a 1–10 score, start and
+finish dates, and free-form notes — and the whole catalog is published as a page
+other people can browse, or kept private with a single switch.
+
+It is franchise-aware: sequels, prequels, spin-offs, movies, and OVAs stay
+separate entries grouped under one franchise, instead of being flattened into a
+fake "season" model. A **Watch next** view uses AniList relations to surface
+titles from franchises you have already watched but never added.
+
+You are the only one who edits it. Sign-in is GitHub OAuth through Supabase, a
+single admin user owns the catalog, and everyone else reads.
+
+## What you can do
+
+- **Track status** — `Planned`, `Watching`, `Completed`, `On Hold`, `Dropped`.
+- **Track progress** — episodes watched per entry; picking the last episode
+  completes the entry automatically.
+- **Score** — 1–10 per entry, click the same score again to clear it.
+- **Record dates and notes** — started, completed, and anything worth
+  remembering about the show.
+- **Search and filter** — by romaji or English title, by status, sorted by
+  title, score, recently added, or recently completed.
+- **Group into franchises** — a franchise page with a timeline, per-franchise
+  stats, and the entries you have not watched yet.
+- **Find what is next** — the `Watch next` page ranks unwatched franchise
+  entries by AniList score.
+- **Pull metadata from AniList** — titles, posters, banners, episode counts, and
+  descriptions come from the AniList GraphQL API.
+- **Publish or hide** — flip the whole catalog between public and private.
+- **Back up and restore** — export as portable JSON and merge a backup back in;
+  importing never deletes.
+
+Built with `.NET 10`, `Blazor WebAssembly Standalone`, `Supabase`, and `AniList`.
 
 ## Stack
 
