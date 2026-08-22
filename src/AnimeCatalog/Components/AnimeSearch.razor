@@ -2,7 +2,21 @@
 
 <div class="search-panel">
     <label class="field-label" for="@_inputId">Search AniList</label>
-    <input id="@_inputId" class="text-input" placeholder="Search by title..." value="@_query" @onchange="HandleChangeAsync" />
+
+    <div class="search-panel__field">
+        <input id="@_inputId" class="text-input" placeholder="Search by title..." value="@_query" @onchange="HandleChangeAsync" />
+
+        <button type="button"
+                class="search-panel__action"
+                aria-label="Search AniList"
+                title="Search AniList"
+                @onclick="HandleSearchClickAsync">
+            <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                <circle cx="9" cy="9" r="5.25" />
+                <path d="M13 13 17 17" />
+            </svg>
+        </button>
+    </div>
 
     @if (_isLoading)
     {
@@ -30,6 +44,7 @@
     private const int MinimumQueryLength = 2;
     private readonly string _inputId = $"anilist-search-{Guid.NewGuid():N}";
     private string _query = string.Empty;
+    private string? _searchedQuery;
     private int? _selectedMediaId;
     private bool _isLoading;
     private string? _error;
@@ -49,21 +64,30 @@
     private long? GetExistingAnimeEntryId(int aniListId) =>
         CatalogedAniListIds.TryGetValue(aniListId, out var animeEntryId) ? animeEntryId : null;
 
+    // change fires on blur and on Enter, so clicking the search action already commits the text:
+    // the browser blurs the input first, and Blazor delivers that change before the click. The
+    // click below therefore only has to cover what change skips -- an unchanged value, and a
+    // retry after a failed request.
     private async Task HandleChangeAsync(ChangeEventArgs args)
     {
-        var nextQuery = args.Value?.ToString() ?? string.Empty;
-        if (_query == nextQuery)
-        {
-            return;
-        }
-
-        _query = nextQuery;
+        _query = args.Value?.ToString() ?? string.Empty;
         await SearchAsync();
     }
+
+    private Task HandleSearchClickAsync() => SearchAsync();
 
     private async Task SearchAsync()
     {
         var trimmedQuery = _query.Trim();
+
+        // Dedupe on what was actually sent, not on what the box held: a blur with untouched text
+        // must not re-request, and the click after that blur must not double it.
+        if (string.Equals(trimmedQuery, _searchedQuery, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _searchedQuery = trimmedQuery;
 
         if (string.IsNullOrWhiteSpace(trimmedQuery) || trimmedQuery.Length < MinimumQueryLength)
         {
@@ -91,6 +115,10 @@
         {
             _error = ex.Message;
             _results = [];
+
+            // A failed query was never really served, so forget it: clicking the search action is
+            // then a retry rather than a no-op the dedupe swallows.
+            _searchedQuery = null;
         }
         finally
         {

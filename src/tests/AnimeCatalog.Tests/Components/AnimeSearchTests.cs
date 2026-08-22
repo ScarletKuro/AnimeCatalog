@@ -116,12 +116,88 @@ public sealed class AnimeSearchTests
             Assert.Empty(cut.FindAll(".search-result--selected"));
         });
     }
+    // The browser blurs the input before the click lands, so the real path through the action is
+    // change-then-click. It must cost exactly one request, not two.
+    [Fact]
+    public void ChangeFollowedByTheSearchAction_SearchesOnce()
+    {
+        var aniList = new StubAniListService(new Dictionary<string, IReadOnlyList<AniListMedia>>
+        {
+            ["gundam"] = [CreateMedia(1, "Mobile Suit Gundam")]
+        });
 
-    private static AdminCatalogService CreateAdminCatalogService(IReadOnlyDictionary<string, IReadOnlyList<AniListMedia>> searchResults)
+        using var context = new BunitContext();
+        context.Services.AddSingleton(CreateAdminCatalogService(aniList));
+
+        var cut = context.Render<AnimeSearch>();
+
+        cut.Find("input").Change("gundam");
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".search-result")));
+
+        cut.Find(".search-panel__action").Click();
+
+        Assert.Equal(1, aniList.SearchCalls);
+        Assert.Single(cut.FindAll(".search-result"));
+    }
+
+    // Blur used to be deduped against the pending query text; the dedupe now sits on the last
+    // query actually sent, so an untouched blur must still cost nothing.
+    [Fact]
+    public void RepeatedChangeWithTheSameText_SearchesOnce()
+    {
+        var aniList = new StubAniListService(new Dictionary<string, IReadOnlyList<AniListMedia>>
+        {
+            ["gundam"] = [CreateMedia(1, "Mobile Suit Gundam")]
+        });
+
+        using var context = new BunitContext();
+        context.Services.AddSingleton(CreateAdminCatalogService(aniList));
+
+        var cut = context.Render<AnimeSearch>();
+
+        cut.Find("input").Change("gundam");
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".search-result")));
+
+        cut.Find("input").Change("gundam");
+
+        Assert.Equal(1, aniList.SearchCalls);
+    }
+
+    // A failed query is the one case where change cannot help: the text has not moved, so only
+    // the action can ask again.
+    [Fact]
+    public void SearchAction_RetriesAfterAFailedSearch()
+    {
+        var aniList = new StubAniListService(new Dictionary<string, IReadOnlyList<AniListMedia>>
+        {
+            ["gundam"] = [CreateMedia(1, "Mobile Suit Gundam")]
+        })
+        {
+            FailuresRemaining = 1
+        };
+
+        using var context = new BunitContext();
+        context.Services.AddSingleton(CreateAdminCatalogService(aniList));
+
+        var cut = context.Render<AnimeSearch>();
+
+        cut.Find("input").Change("gundam");
+        cut.WaitForAssertion(() => Assert.Contains("AniList search failed", cut.Markup));
+
+        cut.Find(".search-panel__action").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".search-result")));
+        Assert.Equal(2, aniList.SearchCalls);
+    }
+
+    private static AdminCatalogService CreateAdminCatalogService(IReadOnlyDictionary<string, IReadOnlyList<AniListMedia>> searchResults) =>
+        CreateAdminCatalogService(new StubAniListService(searchResults));
+
+    private static AdminCatalogService CreateAdminCatalogService(StubAniListService aniList)
     {
         return new AdminCatalogService(
             new StubSupabaseRestService(),
-            new StubAniListService(searchResults),
+            aniList,
             new StubAdminAuthorizationService(),
             new StubCatalogService());
     }
@@ -150,8 +226,21 @@ public sealed class AnimeSearchTests
             _searchResults = searchResults;
         }
 
+        public int SearchCalls { get; private set; }
+
+        /// <summary>Number of leading calls that throw, for exercising the retry path.</summary>
+        public int FailuresRemaining { get; set; }
+
         public Task<IReadOnlyList<AniListMedia>> SearchAnimeAsync(string search, CancellationToken cancellationToken = default)
         {
+            SearchCalls++;
+
+            if (FailuresRemaining > 0)
+            {
+                FailuresRemaining--;
+                throw new InvalidOperationException("AniList is unavailable.");
+            }
+
             return Task.FromResult(_searchResults.TryGetValue(search, out var results)
                 ? results
                 : Array.Empty<AniListMedia>() as IReadOnlyList<AniListMedia>);
