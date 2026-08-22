@@ -277,6 +277,9 @@
   .inline {
     display: inline;
   }
+  .table {
+    display: table;
+  }
   .border {
     border-style: var(--tw-border-style);
     border-width: 1px;
@@ -1760,6 +1763,76 @@
   .franchise-grid {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
+  .catalog-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .catalog-pager__pages {
+    margin: 0px;
+    display: flex;
+    list-style-type: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+    padding: 0px;
+  }
+  .catalog-pager__step, .catalog-pager__page, .catalog-pager__gap {
+    display: grid;
+    height: calc(var(--spacing) * 9);
+    min-width: calc(var(--spacing) * 9);
+    flex-shrink: 0;
+    cursor: pointer;
+    place-items: center;
+    border-radius: calc(infinity * 1px);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    padding-inline: calc(var(--spacing) * 2);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-soft);
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+    font-variant-numeric: tabular-nums;
+  }
+  .catalog-pager__step:hover:not(:disabled), .catalog-pager__page:hover {
+    color: var(--text-strong);
+    border-color: rgba(158, 240, 255, 0.24);
+    background: rgba(158, 240, 255, 0.1);
+  }
+  .catalog-pager__step:disabled {
+    cursor: default;
+    opacity: 65%;
+  }
+  .catalog-pager__page--current {
+    border-color: transparent;
+    color: var(--color-slate-950);
+    background: linear-gradient(135deg, #9ef0ff, #f5e598);
+  }
+  .catalog-pager__page--current:hover {
+    color: var(--color-slate-950);
+    border-color: transparent;
+    background: linear-gradient(135deg, #9ef0ff, #f5e598);
+  }
+  .catalog-pager__gap {
+    cursor: default;
+    border-color: transparent;
+    background-color: transparent;
+  }
+  .catalog-pager__step svg {
+    height: calc(var(--spacing) * 4);
+    width: calc(var(--spacing) * 4);
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+  }
   .franchise-card, .poster-card {
     position: relative;
     display: grid;
@@ -2778,7 +2851,7 @@
     align-items: center;
     pointer-events: none;
   }
-  .schedule-toolbar {
+  .schedule-toolbar, .catalog-toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -2794,7 +2867,7 @@
     color: var(--text-strong);
     font-variant-numeric: tabular-nums;
   }
-  .schedule-toolbar__status {
+  .schedule-toolbar__status, .catalog-toolbar__status {
     margin: 0px;
     font-size: var(--text-sm);
     line-height: var(--tw-leading, var(--text-sm--line-height));

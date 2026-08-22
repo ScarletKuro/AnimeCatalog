@@ -702,13 +702,18 @@ public sealed class FranchiseService
             || entry.AnimeEntry.TitleEnglish?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
     }
 
+    // Every arm is tiebroken by title. The catalog is paged, so a boundary between page 1 and page 2
+    // has to fall in the same place on every load - and a bulk import shares one created_at, while
+    // every unfinished franchise shares a null completed_at. Stable ordering was already true here,
+    // but only because OrderByDescending is stable and the REST layer defaults to id.asc three calls
+    // away. This states it instead of inheriting it.
     private static IReadOnlyList<FranchiseSummaryViewModel> ApplySort(IReadOnlyList<FranchiseSummaryViewModel> items, CatalogSortOption sort)
     {
         return sort switch
         {
             CatalogSortOption.ScoreDescending => items.OrderByDescending(item => item.AverageScore ?? -1).ThenBy(item => item.Title).ToList(),
-            CatalogSortOption.RecentlyAdded => items.OrderByDescending(item => item.Entries.Max(entry => entry.CatalogEntry.CreatedAt)).ToList(),
-            CatalogSortOption.RecentlyCompleted => items.OrderByDescending(item => item.Entries.Max(entry => entry.CatalogEntry.CompletedAt?.ToDateTime(TimeOnly.MinValue))).ToList(),
+            CatalogSortOption.RecentlyAdded => items.OrderByDescending(item => item.Entries.Max(entry => entry.CatalogEntry.CreatedAt)).ThenBy(item => item.Title).ToList(),
+            CatalogSortOption.RecentlyCompleted => items.OrderByDescending(item => item.Entries.Max(entry => entry.CatalogEntry.CompletedAt?.ToDateTime(TimeOnly.MinValue))).ThenBy(item => item.Title).ToList(),
             CatalogSortOption.Year => items.OrderByDescending(item => item.Entries.Max(entry => entry.AnimeEntry.SeasonYear)).ThenBy(item => item.Title).ToList(),
             _ => items.OrderBy(item => item.Title).ToList()
         };

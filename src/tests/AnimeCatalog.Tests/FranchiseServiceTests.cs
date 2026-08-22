@@ -205,6 +205,59 @@ public sealed class FranchiseServiceTests
         Assert.Equal(5, result.StatusBreakdown.Count);
     }
 
+    // A bulk import gives every row the same created_at, so this tie is the normal case rather than
+    // a contrived one. The catalog is paged, and a boundary between page 1 and page 2 has to fall in
+    // the same place on every load.
+    [Fact]
+    public void BuildCatalog_RecentlyAddedBreaksTiesByTitle()
+    {
+        var imported = At(2026, 3, 1);
+        var entries = new[]
+        {
+            new AnimeEntry { Id = 1, TitleRomaji = "Charlie", DisplayOrder = 1 },
+            new AnimeEntry { Id = 2, TitleRomaji = "Alpha", DisplayOrder = 1 },
+            new AnimeEntry { Id = 3, TitleRomaji = "Bravo", DisplayOrder = 1 }
+        };
+        var catalog = entries.Select(entry => new CatalogEntry
+        {
+            AnimeEntryId = entry.Id,
+            Status = CatalogStatus.Completed,
+            CreatedAt = imported
+        }).ToArray();
+
+        var result = _service.BuildCatalog(entries, catalog, [], [], new CatalogFilters
+        {
+            Sort = CatalogSortOption.RecentlyAdded
+        });
+
+        Assert.Equal(["Alpha", "Bravo", "Charlie"], result.Select(item => item.Title));
+    }
+
+    // Every franchise nobody has finished shares a null completed_at, which is the same tie again and
+    // covers most of a real catalog.
+    [Fact]
+    public void BuildCatalog_RecentlyCompletedOrdersUnfinishedFranchisesByTitle()
+    {
+        var entries = new[]
+        {
+            new AnimeEntry { Id = 1, TitleRomaji = "Charlie", DisplayOrder = 1 },
+            new AnimeEntry { Id = 2, TitleRomaji = "Alpha", DisplayOrder = 1 },
+            new AnimeEntry { Id = 3, TitleRomaji = "Bravo", DisplayOrder = 1 }
+        };
+        var catalog = entries.Select(entry => new CatalogEntry
+        {
+            AnimeEntryId = entry.Id,
+            Status = CatalogStatus.Watching
+        }).ToArray();
+
+        var result = _service.BuildCatalog(entries, catalog, [], [], new CatalogFilters
+        {
+            Sort = CatalogSortOption.RecentlyCompleted
+        });
+
+        Assert.Equal(["Alpha", "Bravo", "Charlie"], result.Select(item => item.Title));
+    }
+
     private static readonly DateTimeOffset Now = new(2026, 8, 18, 12, 0, 0, TimeSpan.Zero);
 
     private static DateTimeOffset At(int year, int month, int day) => new(year, month, day, 10, 0, 0, TimeSpan.Zero);

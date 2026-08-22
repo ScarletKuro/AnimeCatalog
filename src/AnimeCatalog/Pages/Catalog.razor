@@ -1,5 +1,8 @@
 @page "/catalog"
+@implements IDisposable
 @inject CatalogService CatalogService
+@inject NavigationManager NavigationManager
+@inject BrowserStorageService BrowserStorageService
 
 <PageTitle>Catalog</PageTitle>
 
@@ -9,7 +12,10 @@
 <AuthStateWatcher OnIdentityChanged="ReloadForAuthChangeAsync" />
 
 <section class="stack">
-    <div class="page-header">
+    @* Holds the scroll anchor because it is the one element outside every conditional below. The
+       grid would do the job on the happy path and hand interop a default ElementReference on the
+       empty, private and failed ones. *@
+    <div class="page-header" @ref="_pageHeader">
         <div>
             <p class="eyebrow">Catalog</p>
             <h1>Franchise-aware watch history</h1>
@@ -33,15 +39,18 @@
     }
     else
     {
+        @* Every control writes to the address rather than to a field, and re-reads its own value
+           back out of it. That is what makes a filtered catalog a place: it survives a refresh, it
+           pastes into a message, and Back returns to it. *@
         <div class="filters-card">
             <label class="field">
                 <span class="field-label">Search</span>
-                <input class="text-input" placeholder="Romaji or English title..." value="@_filters.Query" @oninput="OnQueryChangedAsync" />
+                <input class="text-input" placeholder="Romaji or English title..." value="@_query" @oninput="OnQueryChanged" />
             </label>
 
             <label class="field">
                 <span class="field-label">Status</span>
-                <select class="select-input" value="@_statusFilterText" @onchange="OnStatusChangedAsync">
+                <select class="select-input" value="@_statusText" @onchange="OnStatusChanged">
                     <option value="">All</option>
                     <option value="watching">Watching</option>
                     <option value="completed">Completed</option>
@@ -53,7 +62,7 @@
 
             <label class="field">
                 <span class="field-label">Sort</span>
-                <select class="select-input" value="@_filters.Sort" @onchange="OnSortChangedAsync">
+                <select class="select-input" value="@_sort" @onchange="OnSortChanged">
                     <option value="@CatalogSortOption.Title">Title</option>
                     <option value="@CatalogSortOption.ScoreDescending">Score descending</option>
                     <option value="@CatalogSortOption.RecentlyAdded">Recently added</option>
@@ -80,32 +89,253 @@
         }
         else
         {
+            @* Above the grid, and counting the whole filtered set rather than the slice: a page of
+               48 out of 130 otherwise reads as the catalog having shrunk. *@
+            <div class="catalog-toolbar">
+                <p class="catalog-toolbar__status" role="status" aria-live="polite">@RangeLabel</p>
+            </div>
+
             <div class="franchise-grid">
-                @foreach (var item in _items)
+                @foreach (var item in PageItems)
                 {
-                    <FranchiseCard Summary="item" />
+                    @* Keyed on the same group key BuildCatalog groups by. Without it Blazor matches
+                       cards positionally, so paging or re-sorting left an expanded panel attached to
+                       whichever franchise happened to land in that slot. *@
+                    <FranchiseCard @key="KeyFor(item)" Summary="item" />
                 }
             </div>
+
+            @if (PageCount > 1)
+            {
+                @* A navigation landmark, because it is a list of destinations rather than a widget,
+                   and the numbers carry the position that a "page 2 of 3" caption used to spell out.
+
+                   The four steps are icon-only, so each one states its own name: this is the one
+                   place the house preference for a self-describing label cannot apply, an arrow
+                   having no text to read. aria-current marks the page being viewed, which is what
+                   lets a screen reader announce the list without the styling. *@
+                <nav class="catalog-pager" aria-label="Catalog pages">
+                    <button type="button" class="catalog-pager__step" aria-label="First page" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(1)">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M13 5.25 8.25 10 13 14.75" />
+                            <path d="M6.5 5.25v9.5" />
+                        </svg>
+                    </button>
+                    <button type="button" class="catalog-pager__step" aria-label="Previous page" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(CurrentPage - 1)">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M12.25 5.25 7.5 10l4.75 4.75" />
+                        </svg>
+                    </button>
+
+                    <ol class="catalog-pager__pages">
+                        @foreach (var slot in PageSlots)
+                        {
+                            <li>
+                                @if (slot is null)
+                                {
+                                    @* Inert and unannounced: it stands for pages that are reachable
+                                       through the numbers around it, not for one of its own. *@
+                                    <span class="catalog-pager__gap" aria-hidden="true">…</span>
+                                }
+                                else
+                                {
+                                    <button type="button"
+                                            class="@(slot == CurrentPage ? "catalog-pager__page catalog-pager__page--current" : "catalog-pager__page")"
+                                            aria-label="@($"Page {slot}")"
+                                            aria-current="@(slot == CurrentPage ? "page" : null)"
+                                            @onclick="() => GoToPage(slot.Value)">@slot</button>
+                                }
+                            </li>
+                        }
+                    </ol>
+
+                    <button type="button" class="catalog-pager__step" aria-label="Next page" disabled="@(CurrentPage >= PageCount)" @onclick="() => GoToPage(CurrentPage + 1)">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M7.75 5.25 12.5 10l-4.75 4.75" />
+                        </svg>
+                    </button>
+                    <button type="button" class="catalog-pager__step" aria-label="Last page" disabled="@(CurrentPage >= PageCount)" @onclick="() => GoToPage(PageCount)">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M7 5.25 11.75 10 7 14.75" />
+                            <path d="M13.5 5.25v9.5" />
+                        </svg>
+                    </button>
+                </nav>
+            }
         }
     }
 </section>
 
 @code {
-    private readonly CatalogFilters _filters = new();
+    /// <summary>
+    /// Divisible by two, three, four and six, so the last row of .franchise-grid is never ragged at
+    /// any of the column counts its auto-fill resolves to.
+    /// </summary>
+    private const int PageSize = 48;
+
+    /// <summary>
+    /// Numbers shown either side of the current page. Two keeps the strip to nine slots at its
+    /// widest, which fits a phone without wrapping.
+    /// </summary>
+    private const int PageWindowRadius = 2;
+
+    // Bound as strings, every one of them, including the page. A typed [SupplyParameterFromQuery]
+    // throws on a value it cannot parse, and it throws from inside SetParametersAsync where the only
+    // thing that could catch it is an error boundary this app does not have - so "?page=abc" would
+    // trade a wrong render for the reload banner. Parsing them here keeps a hand-edited address
+    // merely wrong instead of fatal, and makes the canonical-form comparison below a string compare.
+    [SupplyParameterFromQuery(Name = "q")]
+    private string? QueryParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    private string? StatusParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "sort")]
+    private string? SortParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    private string? PageParam { get; set; }
+
+    // Mirrors of the four parameters. A [Parameter] is never written to, and the controls have to
+    // render from something that survives the round trip a keystroke makes through the address bar.
+    private string _query = string.Empty;
+    private CatalogStatus? _status;
+    private string _statusText = string.Empty; // "" is what the <select> needs for "All".
+    private CatalogSortOption _sort = CatalogSortOption.Title;
+    private int _page = 1; // What the address asked for. Only ever clamped upward for rendering.
+
+    // Search, status and sort - not the page. A page change re-slices a list that is already in
+    // memory, and GetSnapshotAsync is uncached (an access check plus four table reads), so folding
+    // the page into this key would spend five round trips to show cards already downloaded.
+    private string? _filterKey;
+
+    private CancellationTokenSource? _cts;
+    private bool _scrollToTopPending;
+    private ElementReference _pageHeader;
+
     private CatalogAccessState _accessState = CatalogAccessState.Available;
-    private string _statusFilterText = string.Empty;
     private bool _isLoading = true;
     private bool _hasLoaded;
     private string? _error;
     private IReadOnlyList<FranchiseSummaryViewModel> _items = [];
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    /// <summary>Floored at one, so an empty result reads as page 1 of 1 rather than page 1 of 0.</summary>
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(_items.Count / (double)PageSize));
+
+    /// <summary>
+    /// What renders, as opposed to <c>_page</c>, which is what was asked for. Kept as a projection
+    /// so the render path never writes to state the address owns.
+    /// </summary>
+    private int CurrentPage => Math.Clamp(_page, 1, PageCount);
+
+    private int FirstIndex => (CurrentPage - 1) * PageSize;
+
+    private IEnumerable<FranchiseSummaryViewModel> PageItems => _items.Skip(FirstIndex).Take(PageSize);
+
+    // "results" rather than "franchises", because a standalone anime gets a card without being one,
+    // and rather than "entries", because a card holds several and its own toggle already counts them.
+    private string RangeLabel => PageCount == 1
+        ? $"{_items.Count} result{(_items.Count == 1 ? string.Empty : "s")}."
+        : $"Showing {FirstIndex + 1}-{Math.Min(FirstIndex + PageSize, _items.Count)} of {_items.Count} results.";
+
+    /// <summary>
+    /// The page numbers to render, with <c>null</c> standing for a run of pages left out. The first
+    /// and last are always present, so the two ends of the catalog stay one click away however deep
+    /// into it the visitor is.
+    /// </summary>
+    /// <remarks>
+    /// A gap of exactly one page is filled in rather than elided: an ellipsis hiding a single number
+    /// is wider than the number and costs a click to resolve.
+    /// </remarks>
+    private IEnumerable<int?> PageSlots
+    {
+        get
+        {
+            var pages = new SortedSet<int> { 1, PageCount };
+
+            for (var page = CurrentPage - PageWindowRadius; page <= CurrentPage + PageWindowRadius; page++)
+            {
+                if (page >= 1 && page <= PageCount)
+                {
+                    pages.Add(page);
+                }
+            }
+
+            var previous = 0;
+
+            foreach (var page in pages)
+            {
+                if (previous > 0)
+                {
+                    if (page - previous == 2)
+                    {
+                        yield return previous + 1;
+                    }
+                    else if (page - previous > 2)
+                    {
+                        yield return null;
+                    }
+                }
+
+                yield return page;
+                previous = page;
+            }
+        }
+    }
+
+    // Re-fires on every same-component navigation, which is how all four values arrive: the filters
+    // card, the pager, a pasted link and the Back button all funnel through here.
+    protected override Task OnParametersSetAsync()
+    {
+        var query = CatalogUrl.ParseQuery(QueryParam);
+        var status = CatalogUrl.ParseStatus(StatusParam);
+        var sort = CatalogUrl.ParseSort(SortParam);
+        var page = CatalogUrl.ParsePage(PageParam);
+
+        // Compared on the raw parameter strings rather than against NavigationManager.Uri: the Uri
+        // is the base address when a component is rendered directly, which would make every such
+        // render look like it needed correcting, and comparing parsed values instead of their text
+        // cannot see "?page=1" or "?sort=year" as needing a rewrite at all. Because the canonical
+        // text of an already-canonical value is itself, this converges in exactly one extra pass -
+        // the same allowed re-entry ArchiveCalendar leans on, and why the redirect is unguarded.
+        var needsCanonicalUrl =
+            !string.Equals(QueryParam, CatalogUrl.QueryText(query), StringComparison.Ordinal)
+            || !string.Equals(StatusParam, CatalogUrl.StatusText(status), StringComparison.Ordinal)
+            || !string.Equals(SortParam, CatalogUrl.SortText(sort), StringComparison.Ordinal)
+            || !string.Equals(PageParam, CatalogUrl.PageText(page), StringComparison.Ordinal);
+
+        if (needsCanonicalUrl)
+        {
+            // Replaces rather than pushes: an address this page had to correct is not somewhere Back
+            // should be able to return to.
+            NavigationManager.NavigateTo(CatalogUrl.For(query, status, sort, page), replace: true);
+        }
+
+        _query = query;
+        _status = status;
+        _statusText = CatalogUrl.StatusText(status) ?? string.Empty;
+        _sort = sort;
+        _page = page;
+
+        var filterKey = $"{query}|{status}|{sort}";
+
+        if (_filterKey == filterKey)
+        {
+            // A page-only change, or the second pass of the redirect above. The list is already in
+            // memory and the render that follows this method re-slices it. No fetch.
+            return Task.CompletedTask;
+        }
+
+        _filterKey = filterKey;
+        return LoadAsync();
+    }
 
     // _hasLoaded is what keeps the filters above the fold hidden until access is settled (see the
     // comment on the loading branch). LoadAsync only resets _isLoading, which gates the grid *below*
     // the filters card - so a sign-out has to drop back to the pre-access state here, or a private
-    // catalog flashes a search bar before refusing access. The filters themselves are deliberately
-    // kept: the identity changed, not the query the visitor typed.
+    // catalog flashes a search bar before refusing access. _filterKey is deliberately left alone:
+    // the identity changed, not the address, so it still describes what is about to be loaded, and
+    // clearing it would have the post-load clamp's re-entry start a second identical load.
     private Task ReloadForAuthChangeAsync()
     {
         _hasLoaded = false;
@@ -127,12 +357,29 @@
             return;
         }
 
+        // Cancel-and-recreate, as both calendars do. Every keystroke starts a load and the snapshot
+        // behind it is uncached, so without this an earlier response can land after a later one and
+        // swap the list out from under a page number that stayed put.
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        var filters = new CatalogFilters { Query = _query, Status = _status, Sort = _sort };
+        var loaded = false;
+
         try
         {
             _isLoading = true;
             _accessState = CatalogAccessState.Available;
             _error = null;
-            _items = await CatalogService.GetCatalogAsync(_filters);
+            _items = await CatalogService.GetCatalogAsync(filters, token);
+            loaded = true;
+        }
+        // Ahead of the refusal filter, which would otherwise get a chance to misread it: a
+        // cancellation means a newer filter set is already in flight, not that anything failed.
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex) when (CatalogAccess.IsPrivateAccessDenied(ex))
         {
@@ -147,31 +394,70 @@
         }
         finally
         {
-            _isLoading = false;
-            _hasLoaded = true;
+            // Left to the load that superseded this one, which is about to set both itself.
+            if (!token.IsCancellationRequested)
+            {
+                _isLoading = false;
+                _hasLoaded = true;
+            }
+        }
+
+        // The upper page clamp, and the only place it can live: until here _items belonged to the
+        // *previous* filter set, so clamping in OnParametersSetAsync would rewrite the address to a
+        // page that does not exist either and then rewrite it again once the real list landed.
+        // Success only - a transient failure on page 5 must not quietly move the visitor to page 1
+        // and lose their place across a Retry. Terminating: the re-entrant OnParametersSetAsync will
+        // not reload, because _filterKey is unchanged, and cannot clamp again, because _page now
+        // sits inside the range.
+        if (loaded && CurrentPage != _page)
+        {
+            NavigationManager.NavigateTo(CatalogUrl.For(_query, _status, _sort, CurrentPage), replace: true);
         }
     }
 
-    private async Task OnQueryChangedAsync(ChangeEventArgs args)
+    // The three filters replace rather than push: typing six characters must not bury the page the
+    // visitor arrived from under six history entries. They also return to page 1, because page 3 of
+    // a narrower list is a different place, not the same one.
+    private void OnQueryChanged(ChangeEventArgs args) =>
+        Navigate(CatalogUrl.ParseQuery(args.Value?.ToString()), _status, _sort, page: 1, replace: true);
+
+    private void OnStatusChanged(ChangeEventArgs args) =>
+        Navigate(_query, CatalogUrl.ParseStatus(args.Value?.ToString()), _sort, page: 1, replace: true);
+
+    private void OnSortChanged(ChangeEventArgs args) =>
+        Navigate(_query, _status, CatalogUrl.ParseSort(args.Value?.ToString()), page: 1, replace: true);
+
+    // Pushed, so Back walks back through the pages a visitor read - which is the whole point.
+    private void GoToPage(int page)
     {
-        _filters.Query = args.Value?.ToString() ?? string.Empty;
-        await LoadAsync();
+        // Set here and nowhere else. It is what separates a pager click from a Back restore, which
+        // re-enters OnParametersSetAsync without passing through any handler and whose scroll offset
+        // the browser is already restoring, and from a filter change, where the visitor is at the
+        // top of the page typing.
+        _scrollToTopPending = true;
+        Navigate(_query, _status, _sort, Math.Clamp(page, 1, PageCount), replace: false);
     }
 
-    private async Task OnStatusChangedAsync(ChangeEventArgs args)
+    private void Navigate(string query, CatalogStatus? status, CatalogSortOption sort, int page, bool replace) =>
+        NavigationManager.NavigateTo(CatalogUrl.For(query, status, sort, page), replace: replace);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _statusFilterText = args.Value?.ToString() ?? string.Empty;
-        _filters.Status = string.IsNullOrWhiteSpace(_statusFilterText)
-            ? null
-            : CatalogStatusExtensions.Parse(_statusFilterText);
-        await LoadAsync();
+        if (!_scrollToTopPending)
+        {
+            return;
+        }
+
+        _scrollToTopPending = false;
+        await BrowserStorageService.ScrollElementIntoViewAsync(_pageHeader);
     }
 
-    private async Task OnSortChangedAsync(ChangeEventArgs args)
+    private static long KeyFor(FranchiseSummaryViewModel item) =>
+        item.FranchiseId ?? -item.VisibleEntries[0].AnimeEntry.Id;
+
+    public void Dispose()
     {
-        _filters.Sort = Enum.TryParse<CatalogSortOption>(args.Value?.ToString(), out var sort)
-            ? sort
-            : CatalogSortOption.Title;
-        await LoadAsync();
+        _cts?.Cancel();
+        _cts?.Dispose();
     }
 }

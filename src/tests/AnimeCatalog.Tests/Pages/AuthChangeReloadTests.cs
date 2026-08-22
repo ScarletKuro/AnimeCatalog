@@ -39,6 +39,28 @@ public sealed class AuthChangeReloadTests
         Assert.Equal(uriBeforeSignOut, navigation.Uri);
     }
 
+    // The catalog's filters live in the address now, and a sign-out does not change the address - so
+    // the reload it triggers must not rewrite it either. A reload that reset the page's filter key
+    // would come back through the canonical-form check and could spell the same state differently.
+    [Fact]
+    public async Task Catalog_SigningOut_KeepsTheFiltersInTheAddress()
+    {
+        await using var context = CreateContext("catalog?q=g&sort=Year", out var access, out var auth);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+
+        var cut = context.Render<Catalog>();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".filters-card")));
+
+        var uriBeforeSignOut = navigation.Uri;
+        access.CanRead = false;
+        auth.SignOut();
+
+        cut.WaitForAssertion(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
+
+        Assert.EndsWith("catalog?q=g&sort=Year", navigation.Uri);
+        Assert.Equal(uriBeforeSignOut, navigation.Uri);
+    }
+
     [Fact]
     public async Task Home_SigningOut_ReplacesTheSummaryWithThePrivateCard()
     {

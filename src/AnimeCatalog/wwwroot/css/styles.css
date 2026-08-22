@@ -1325,6 +1325,69 @@
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     }
 
+    /* Centred below the grid, and only there: the count line above the grid already says where you
+       are, so a second copy of the controls up top would just be more to skip past. */
+    .catalog-pager {
+        @apply flex flex-wrap items-center justify-center gap-1.5;
+    }
+
+    .catalog-pager__pages {
+        @apply m-0 flex list-none flex-wrap items-center gap-1.5 p-0;
+    }
+
+    /* One square for every control in the strip, arrows and numbers alike, so the row reads as a
+       single object rather than as icons parked beside a list. */
+    .catalog-pager__step,
+    .catalog-pager__page,
+    .catalog-pager__gap {
+        @apply grid h-9 min-w-9 shrink-0 cursor-pointer place-items-center rounded-full border px-2 text-sm font-semibold;
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-soft);
+        transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+        /* So a strip of numbers does not shift sideways stepping from page 9 to page 10. */
+        font-variant-numeric: tabular-nums;
+    }
+
+    .catalog-pager__step:hover:not(:disabled),
+    .catalog-pager__page:hover {
+        color: var(--text-strong);
+        border-color: rgba(158, 240, 255, 0.24);
+        background: rgba(158, 240, 255, 0.1);
+    }
+
+    /* Matches .button:disabled rather than inventing a second disabled look. */
+    .catalog-pager__step:disabled {
+        @apply cursor-default opacity-65;
+    }
+
+    /* The one filled control in the strip, borrowing .button--primary's gradient so "where I am"
+       reads the same here as "the action" does elsewhere. */
+    .catalog-pager__page--current {
+        @apply border-transparent text-slate-950;
+        background: linear-gradient(135deg, #9ef0ff, #f5e598);
+    }
+
+    .catalog-pager__page--current:hover {
+        @apply text-slate-950;
+        border-color: transparent;
+        background: linear-gradient(135deg, #9ef0ff, #f5e598);
+    }
+
+    /* Neither a control nor a destination: no border, no hover, nothing to aim at. */
+    .catalog-pager__gap {
+        @apply cursor-default border-transparent bg-transparent;
+    }
+
+    .catalog-pager__step svg {
+        @apply h-4 w-4;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+    }
+
     .franchise-card,
     .poster-card {
         @apply relative grid overflow-hidden rounded-[var(--radius-lg)] border;
@@ -2338,8 +2401,10 @@
         pointer-events: none;
     }
 
-    /* The week's own toolbar row: navigation on one side, the honest count on the other. */
-    .schedule-toolbar {
+    /* The week's own toolbar row: navigation on one side, the honest count on the other. The catalog
+       joins the shape rather than deriving its own - it wants the same one row with a count on it. */
+    .schedule-toolbar,
+    .catalog-toolbar {
         @apply flex flex-wrap items-center justify-between gap-3;
     }
 
@@ -2349,7 +2414,8 @@
         font-variant-numeric: tabular-nums;
     }
 
-    .schedule-toolbar__status {
+    .schedule-toolbar__status,
+    .catalog-toolbar__status {
         @apply m-0 text-sm;
         color: var(--text-soft);
     }
