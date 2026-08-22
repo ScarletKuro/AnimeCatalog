@@ -115,10 +115,14 @@
                    having no text to read. aria-current marks the page being viewed, which is what
                    lets a screen reader announce the list without the styling. *@
                 <nav class="catalog-pager" aria-label="Catalog pages">
+                    @* Bar and chevron are pushed to opposite edges of the box, 5.75 units apart. Any
+                       tighter and the two strokes close up into the letter K rather than reading as
+                       "jump to the end" - which is what a snug 1.75 did. The chevron keeps the same
+                       4.75 width as the single ones either side of it, so all four match. *@
                     <button type="button" class="catalog-pager__step" aria-label="First page" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(1)">
                         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
-                            <path d="M13 5.25 8.25 10 13 14.75" />
-                            <path d="M6.5 5.25v9.5" />
+                            <path d="M15.25 5.25 10.5 10 15.25 14.75" />
+                            <path d="M4.75 5.25v9.5" />
                         </svg>
                     </button>
                     <button type="button" class="catalog-pager__step" aria-label="Previous page" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(CurrentPage - 1)">
@@ -156,8 +160,8 @@
                     </button>
                     <button type="button" class="catalog-pager__step" aria-label="Last page" disabled="@(CurrentPage >= PageCount)" @onclick="() => GoToPage(PageCount)">
                         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
-                            <path d="M7 5.25 11.75 10 7 14.75" />
-                            <path d="M13.5 5.25v9.5" />
+                            <path d="M4.75 5.25 9.5 10 4.75 14.75" />
+                            <path d="M15.25 5.25v9.5" />
                         </svg>
                     </button>
                 </nav>
