@@ -2439,16 +2439,45 @@
     gap: calc(var(--spacing) * 3);
   }
   .franchise-picker__field {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing) * 2);
+    position: relative;
   }
   .franchise-picker__field .text-input {
-    min-width: 0px;
-    flex: 1;
+    width: 100%;
+    padding-right: calc(var(--spacing) * 12);
   }
   .franchise-picker__clear {
-    flex-shrink: 0;
+    position: absolute;
+    top: calc(1 / 2 * 100%);
+    display: grid;
+    height: calc(var(--spacing) * 6);
+    width: calc(var(--spacing) * 6);
+    --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+    cursor: pointer;
+    place-items: center;
+    border-radius: calc(infinity * 1px);
+    border-style: var(--tw-border-style);
+    border-width: 0px;
+    right: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-soft);
+    transition: color 150ms ease, background-color 150ms ease;
+  }
+  .franchise-picker__clear:hover {
+    color: var(--text-strong);
+    background: rgba(158, 240, 255, 0.1);
+  }
+  .franchise-picker__clear:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .franchise-picker__clear svg {
+    height: calc(var(--spacing) * 3.5);
+    width: calc(var(--spacing) * 3.5);
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
   }
   .franchise-picker__hint {
     margin-bottom: 0px;

@@ -1980,17 +1980,42 @@
         @apply grid gap-3;
     }
 
-    /* Input and Clear share one row, so selecting a franchise never grows the field. */
+    /* The clear control is an in-field adornment: the field is its positioning context and the
+       input reserves the padding for it, so the button appearing or leaving never reflows the
+       text under the cursor. */
     .franchise-picker__field {
-        @apply flex items-center gap-2;
+        @apply relative;
     }
 
     .franchise-picker__field .text-input {
-        @apply min-w-0 flex-1;
+        @apply w-full pr-12;
     }
 
+    /* Same fixed-square + place-items-center glyph chip as .disclosure__chevron. */
     .franchise-picker__clear {
-        @apply shrink-0;
+        @apply absolute top-1/2 grid h-6 w-6 -translate-y-1/2 cursor-pointer place-items-center rounded-full border-0;
+        right: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-soft);
+        transition: color 150ms ease, background-color 150ms ease;
+    }
+
+    .franchise-picker__clear:hover {
+        color: var(--text-strong);
+        background: rgba(158, 240, 255, 0.1);
+    }
+
+    .franchise-picker__clear:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+    }
+
+    .franchise-picker__clear svg {
+        @apply h-3.5 w-3.5;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-width: 1.8;
     }
 
     .franchise-picker__hint {
