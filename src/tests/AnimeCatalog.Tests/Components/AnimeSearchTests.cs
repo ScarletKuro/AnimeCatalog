@@ -308,7 +308,7 @@ public sealed class AnimeSearchTests
         public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(CatalogOverlay.Empty());
 
-        public void InvalidateCatalogOverlay()
+        public void InvalidateCachedReads()
         {
         }
     }

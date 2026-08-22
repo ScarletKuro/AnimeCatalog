@@ -268,6 +268,9 @@ public sealed class CatalogTransferService
             }
         }
 
+        // Outside the per-entry try: an import that skipped some entries still wrote the rest, so the
+        // cached snapshot is stale either way.
+        _catalogService.InvalidateCachedReads();
         return result;
     }
 

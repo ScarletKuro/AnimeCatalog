@@ -2,6 +2,7 @@ using AnimeCatalog.Models;
 using AnimeCatalog.Models.Supabase;
 using AnimeCatalog.ViewModels;
 using AnimeCatalog.Infrastructure;
+using Microsoft.AspNetCore.Components;
 
 namespace AnimeCatalog.Services;
 
@@ -17,26 +18,78 @@ public sealed class CatalogService : ICatalogService
     /// <summary>A refusal is held briefly so a private catalog is not re-asked on every render.</summary>
     private static readonly TimeSpan OverlayFailureTtl = TimeSpan.FromMinutes(2);
 
+    /// <summary>
+    /// A backstop on the four-table snapshot, not the main bound on it - a navigation drops it long
+    /// before this expires (see the remarks on <see cref="GetSnapshotAsync"/>). What is left for the
+    /// TTL to cover is a tab parked on one path for a long time, filtering and sorting in place.
+    /// </summary>
+    private static readonly TimeSpan SnapshotTtl = TimeSpan.FromSeconds(60);
+
     private readonly ISupabaseRestService _supabaseRestService;
     private readonly FranchiseService _franchiseService;
     private readonly ICatalogAccessService _catalogAccessService;
     private readonly TimeProvider _timeProvider;
+    private readonly IAuthStateNotifier? _authStateNotifier;
+    private readonly NavigationManager? _navigationManager;
 
     private CatalogOverlay? _overlay;
     private DateTimeOffset _overlayExpiresAt = DateTimeOffset.MinValue;
 
-    // TimeProvider is a trailing optional parameter on purpose: DI fills it from the registered
-    // singleton, and the eight existing test call sites that pass three arguments keep compiling.
+    private RepositorySnapshot? _snapshot;
+    private DateTimeOffset _snapshotExpiresAt = DateTimeOffset.MinValue;
+    private string? _snapshotPath;
+    private string? _snapshotIdentity;
+
+    // The last three are trailing optional parameters on purpose: DI fills each from its registered
+    // service, and the eight existing test call sites that pass three arguments keep compiling. A
+    // test that supplies neither notifier nor navigation gets a cache keyed on "anonymous" at a
+    // fixed path, which is a fair description of a test with no session and no address bar.
     public CatalogService(
         ISupabaseRestService supabaseRestService,
         FranchiseService franchiseService,
         ICatalogAccessService catalogAccessService,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IAuthStateNotifier? authStateNotifier = null,
+        NavigationManager? navigationManager = null)
     {
         _supabaseRestService = supabaseRestService;
         _franchiseService = franchiseService;
         _catalogAccessService = catalogAccessService;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _authStateNotifier = authStateNotifier;
+        _navigationManager = navigationManager;
+    }
+
+    /// <summary>
+    /// Who the cached snapshot was read for. Deliberately the same coarse pair AuthStateWatcher
+    /// treats as an identity - a token refresh changes nothing about what the RPCs return, and
+    /// dropping the cache on one would undo the point of holding it.
+    /// </summary>
+    private string CurrentIdentity =>
+        $"{_authStateNotifier?.CurrentUserId ?? "anonymous"}|{(_authStateNotifier?.IsAdmin == true ? "admin" : "user")}";
+
+    /// <summary>
+    /// The page asking, with the query string and fragment cut off.
+    /// </summary>
+    /// <remarks>
+    /// Read at the point of use rather than tracked through LocationChanged: by the time anything
+    /// reads a snapshot the address bar already holds the page that wants it, so an event
+    /// subscription would buy nothing and cost this service a lifetime to manage. Cutting the query
+    /// is the whole mechanism - it is what makes a filter change free and a navigation honest.
+    /// </remarks>
+    private string CurrentPath
+    {
+        get
+        {
+            if (_navigationManager is null)
+            {
+                return string.Empty;
+            }
+
+            var relativePath = _navigationManager.ToBaseRelativePath(_navigationManager.Uri);
+            var queryStart = relativePath.IndexOfAny(['?', '#']);
+            return queryStart < 0 ? relativePath : relativePath[..queryStart];
+        }
     }
 
     public bool IsConfigured => _supabaseRestService.IsConfigured;
@@ -143,13 +196,52 @@ public sealed class CatalogService : ICatalogService
         };
     }
 
+    /// <remarks>
+    /// The rows are cached, and three things have to agree before a cached copy is handed back: the
+    /// page asking has to be the same one it was read for, the visitor has to be the same, and the
+    /// copy has to be younger than <see cref="SnapshotTtl"/>. The access check is never cached.
+    /// <para>
+    /// The reason to cache at all is that filtering, sorting and grouping happen client-side in
+    /// <see cref="FranchiseService"/>, so a search term never reached Supabase - typing in the
+    /// catalog's search box re-read four identical tables per keystroke.
+    /// </para>
+    /// <para>
+    /// The reason to key on the path is that the saving is only wanted <em>within</em> a page. A
+    /// filter, a sort and a page number are all query-string changes on one path, so those stay
+    /// free; walking off to the calendar and back is a path change, and re-reads. That keeps the
+    /// rule the app had before this cache existed - a navigation shows you current data - which
+    /// matters most across two devices, where a stale catalog does not read as stale, it reads as
+    /// the entry you just added on your phone having failed to save. A TTL alone could only make
+    /// that unlikely; the path makes it impossible. What the TTL still does is bound a tab left
+    /// parked on one path.
+    /// </para>
+    /// <para>
+    /// And the reason to key on identity is that row-level security decides what those four reads
+    /// return: an admin's snapshot must not be handed to the anonymous visitor the same browser
+    /// turns into a moment later. Every page that reacts to a sign-out reloads through here, so
+    /// keying on it means none of them has to remember to say so.
+    /// </para>
+    /// </remarks>
     public async Task<RepositorySnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             if (!await _catalogAccessService.CanCurrentUserReadCatalogAsync(cancellationToken))
             {
+                // Dropped rather than left to expire: access was refused, so nothing that was read
+                // under the previous answer has any business staying in memory.
+                InvalidateCachedReads();
                 throw new CatalogAccessDeniedException();
+            }
+
+            var now = _timeProvider.GetUtcNow();
+
+            if (_snapshot is not null
+                && _snapshotExpiresAt > now
+                && string.Equals(_snapshotPath, CurrentPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(_snapshotIdentity, CurrentIdentity, StringComparison.Ordinal))
+            {
+                return _snapshot;
             }
 
             var animeRowsTask = _supabaseRestService.SelectAsync<AnimeEntryRow>("anime_entries", cancellationToken: cancellationToken);
@@ -159,11 +251,21 @@ public sealed class CatalogService : ICatalogService
 
             await Task.WhenAll(animeRowsTask, catalogRowsTask, relationRowsTask, franchiseRowsTask);
 
-            return new RepositorySnapshot(
+            // Safe to hand the same instance to every caller: RepositorySnapshot is a record over
+            // IReadOnlyList, and nothing downstream writes to one.
+            _snapshot = new RepositorySnapshot(
                 animeRowsTask.Result.Select(Map).ToList(),
                 catalogRowsTask.Result.Select(Map).ToList(),
                 relationRowsTask.Result.Select(Map).ToList(),
                 franchiseRowsTask.Result.Select(Map).ToList());
+
+            // Stamped from the clock read before the request rather than after it, so a slow read
+            // cannot extend its own lifetime.
+            _snapshotExpiresAt = now + SnapshotTtl;
+            _snapshotPath = CurrentPath;
+            _snapshotIdentity = CurrentIdentity;
+
+            return _snapshot;
         }
         catch (Exception ex) when (CatalogAccess.IsPrivateAccessDenied(ex))
         {
@@ -215,11 +317,23 @@ public sealed class CatalogService : ICatalogService
         }
     }
 
-    /// <summary>Drops the cached overlay so the next read reflects a write that just happened.</summary>
-    public void InvalidateCatalogOverlay()
+    /// <summary>
+    /// Drops both cached reads so the next one reflects a write that just happened.
+    /// </summary>
+    /// <remarks>
+    /// One method rather than two, because the overlay is a projection of the snapshot: dropping the
+    /// derived copy while the rows it was built from stay cached would rebuild it from the same data
+    /// and change nothing. The TTLs are what bound how stale someone *else's* change can be; this is
+    /// for the writer's own, who would otherwise be shown the version they just replaced.
+    /// </remarks>
+    public void InvalidateCachedReads()
     {
         _overlay = null;
         _overlayExpiresAt = DateTimeOffset.MinValue;
+        _snapshot = null;
+        _snapshotExpiresAt = DateTimeOffset.MinValue;
+        _snapshotPath = null;
+        _snapshotIdentity = null;
     }
 
     private static CatalogOverlay Project(RepositorySnapshot snapshot)

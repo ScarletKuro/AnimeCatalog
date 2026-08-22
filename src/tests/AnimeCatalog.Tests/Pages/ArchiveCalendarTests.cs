@@ -621,7 +621,7 @@ public sealed class ArchiveCalendarTests
         public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_overlay);
 
-        public void InvalidateCatalogOverlay()
+        public void InvalidateCachedReads()
         {
         }
 

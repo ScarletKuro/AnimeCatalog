@@ -396,7 +396,7 @@
     // would probably absorb it, but spending a request to learn nothing changed is still wrong.
     private async Task RefreshOverlayAsync()
     {
-        CatalogService.InvalidateCatalogOverlay();
+        CatalogService.InvalidateCachedReads();
         _overlay = await CatalogService.GetCatalogOverlayAsync();
 
         Rebuild(_loadedMedia);

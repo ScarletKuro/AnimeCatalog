@@ -102,10 +102,11 @@ public sealed class CatalogTests
         Assert.Equal(readsAfterFirstLoad, supabase.SelectCount);
     }
 
-    // The other half of the pair, so nobody widens that gate into a stale cache: a filter change
-    // really does have to go back for a differently filtered list.
+    // Filtering happens client-side in FranchiseService, so the four table reads a filter change used
+    // to trigger returned byte-for-byte what was already in memory. CatalogService caches the
+    // snapshot, which is what makes typing cost nothing.
     [Fact]
-    public async Task ChangingAFilterDoesRefetchTheCatalog()
+    public async Task TypingInTheSearchBoxDoesNotRefetchTheCatalog()
     {
         await using var context = CreateSeededContext(130, out var supabase);
 
@@ -114,7 +115,8 @@ public sealed class CatalogTests
 
         cut.Find(".filters-card input").Input(TitleFor(7));
 
-        cut.WaitForAssertion(() => Assert.True(supabase.SelectCount > readsAfterFirstLoad));
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".franchise-card")));
+        Assert.Equal(readsAfterFirstLoad, supabase.SelectCount);
     }
 
     [Fact]
@@ -422,7 +424,8 @@ public sealed class CatalogTests
         context.Services.AddSingleton(sp => new CatalogService(
             sp.GetRequiredService<ISupabaseRestService>(),
             sp.GetRequiredService<FranchiseService>(),
-            sp.GetRequiredService<ICatalogAccessService>()));
+            sp.GetRequiredService<ICatalogAccessService>(),
+            navigationManager: sp.GetRequiredService<NavigationManager>()));
         context.Services.AddSingleton(sp => new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()));
 
         return context;
@@ -447,7 +450,8 @@ public sealed class CatalogTests
         context.Services.AddSingleton(sp => new CatalogService(
             sp.GetRequiredService<ISupabaseRestService>(),
             sp.GetRequiredService<FranchiseService>(),
-            sp.GetRequiredService<ICatalogAccessService>()));
+            sp.GetRequiredService<ICatalogAccessService>(),
+            navigationManager: sp.GetRequiredService<NavigationManager>()));
         context.Services.AddSingleton(sp => new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()));
 
         return context;

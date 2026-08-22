@@ -260,6 +260,10 @@ public sealed class AdminCatalogService
         }
 
         await ReplaceRelationsAsync(targetAnimeEntryId.Value, model.AniListId, cancellationToken);
+
+        // Last, so a throw anywhere above leaves the cache describing what is actually stored. Covers
+        // RefreshMetadataAsync too, which finishes by coming back through here.
+        _catalogService.InvalidateCachedReads();
         return targetAnimeEntryId.Value;
     }
 
@@ -298,6 +302,10 @@ public sealed class AdminCatalogService
             score,
             episodes_watched = episodesWatched
         }, "anime_entry_id", cancellationToken);
+
+        // The inline status and score controls sit on a page that reads back through the snapshot, so
+        // without this a click would appear to do nothing until the cache expired.
+        _catalogService.InvalidateCachedReads();
     }
 
     public async Task DeleteAsync(long animeEntryId, CancellationToken cancellationToken = default)
@@ -307,6 +315,10 @@ public sealed class AdminCatalogService
         {
             ["id"] = $"eq.{animeEntryId}"
         }, cancellationToken);
+
+        // The page redirects to the catalog straight after this, which reads back through the
+        // snapshot - a stale one would list the entry that was just deleted, still openable.
+        _catalogService.InvalidateCachedReads();
     }
 
     public async Task RefreshMetadataAsync(long animeEntryId, CancellationToken cancellationToken = default)

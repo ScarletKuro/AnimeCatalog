@@ -338,16 +338,86 @@ public sealed class AdminCatalogServiceTests
         Assert.Equal(7, Assert.Single(map).Value);
     }
 
+    // CatalogService caches the four-table snapshot, so a write that does not say so leaves the
+    // writer looking at the version they just replaced. One test per write path, because each one
+    // reaches Supabase by a different route and only SaveAsync is shared.
+    [Fact]
+    public async Task UpdateCatalogEntryAsync_DropsTheCachedReads()
+    {
+        var catalog = new FakeCatalogService(new RepositorySnapshot([], [], [], []));
+        var service = CreateService(new FakeSupabaseRestService(), catalog, CreateMedia(198113));
+
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6);
+
+        Assert.Equal(1, catalog.CacheInvalidations);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DropsTheCachedReads()
+    {
+        var catalog = new FakeCatalogService(new RepositorySnapshot([], [], [], []));
+        var service = CreateService(new FakeSupabaseRestService(), catalog, CreateMedia(198113));
+
+        await service.DeleteAsync(101);
+
+        Assert.Equal(1, catalog.CacheInvalidations);
+    }
+
+    [Fact]
+    public async Task SaveAsync_DropsTheCachedReads()
+    {
+        var supabase = new FakeSupabaseRestService();
+        supabase.NextInsertIds["anime_entries"] = 101;
+        supabase.CatalogEntryExistsByAnimeEntryId[101] = true;
+        var catalog = new FakeCatalogService(new RepositorySnapshot([], [], [], []));
+        var service = CreateService(supabase, catalog, CreateMedia(198113));
+
+        await service.SaveAsync(new AnimeEditorModel
+        {
+            AniListId = 198113,
+            TitleRomaji = "Kill Ao",
+            Status = CatalogStatus.Planned
+        });
+
+        Assert.Equal(1, catalog.CacheInvalidations);
+    }
+
+    // A failed write must not drop the cache: the rows in memory still describe what is stored, and
+    // throwing them away would cost a re-read to arrive back at the same answer.
+    [Fact]
+    public async Task AFailedSaveLeavesTheCachedReadsAlone()
+    {
+        var catalog = new FakeCatalogService(new RepositorySnapshot([], [], [], []));
+        var service = CreateService(new FakeSupabaseRestService(), catalog, CreateMedia(198113));
+
+        await Assert.ThrowsAnyAsync<Exception>(() => service.SaveAsync(new AnimeEditorModel
+        {
+            // No title, so validation refuses the model before anything is written.
+            AniListId = 198113,
+            Status = CatalogStatus.Watching
+        }));
+
+        Assert.Equal(0, catalog.CacheInvalidations);
+    }
+
     private static AdminCatalogService CreateService(
         FakeSupabaseRestService supabase,
         RepositorySnapshot snapshot,
+        AniListMedia aniListMedia)
+    {
+        return CreateService(supabase, new FakeCatalogService(snapshot), aniListMedia);
+    }
+
+    private static AdminCatalogService CreateService(
+        FakeSupabaseRestService supabase,
+        FakeCatalogService catalogService,
         AniListMedia aniListMedia)
     {
         return new AdminCatalogService(
             supabase,
             new FakeAniListService(aniListMedia),
             new FakeAdminAuthorizationService(),
-            new FakeCatalogService(snapshot));
+            catalogService);
     }
 
     private static AniListMedia CreateMedia(int id, string englishTitle = "KILL BLUE", IEnumerable<int>? relationAniListIds = null, int? episodes = null)
@@ -611,8 +681,11 @@ public sealed class AdminCatalogServiceTests
         public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(CatalogOverlay.Empty());
 
-        public void InvalidateCatalogOverlay()
+        public void InvalidateCachedReads()
         {
+            CacheInvalidations++;
         }
+
+        public int CacheInvalidations { get; private set; }
     }
 }

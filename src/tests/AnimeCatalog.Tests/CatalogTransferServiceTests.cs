@@ -259,6 +259,36 @@ public sealed class CatalogTransferServiceTests
             () => service.ImportAsync(new CatalogExportFile { Version = 99 }));
     }
 
+    // CatalogService caches the four-table snapshot, and an import rewrites most of it. Asserted
+    // outside the per-entry error handling too: an import that skipped some entries still wrote the
+    // rest, so the cached rows are stale either way.
+    [Fact]
+    public async Task ImportAsync_DropsTheCachedReads()
+    {
+        var catalog = new FakeCatalog(new RepositorySnapshot([], [], [], []));
+        var service = new CatalogTransferService(new FakeSupabase(), catalog, new FakeAdmin());
+
+        var result = await service.ImportAsync(new CatalogExportFile
+        {
+            Entries = [ExportEntry(356, "completed"), ExportEntry(1, "nonsense")]
+        });
+
+        Assert.Single(result.Skipped);
+        Assert.Equal(1, catalog.CacheInvalidations);
+    }
+
+    [Fact]
+    public async Task ImportAsync_LeavesTheCachedReadsAloneWhenTheFileIsRejected()
+    {
+        var catalog = new FakeCatalog(new RepositorySnapshot([], [], [], []));
+        var service = new CatalogTransferService(new FakeSupabase(), catalog, new FakeAdmin());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.ImportAsync(new CatalogExportFile { Version = 99 }));
+
+        Assert.Equal(0, catalog.CacheInvalidations);
+    }
+
     [Fact]
     public async Task ImportAsync_RequiresAdmin()
     {
@@ -361,9 +391,12 @@ public sealed class CatalogTransferServiceTests
         public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(CatalogOverlay.Empty());
 
-        public void InvalidateCatalogOverlay()
+        public void InvalidateCachedReads()
         {
+            CacheInvalidations++;
         }
+
+        public int CacheInvalidations { get; private set; }
 
         public Task<IReadOnlyList<FranchiseSummaryViewModel>> GetCatalogAsync(CatalogFilters? filters = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();

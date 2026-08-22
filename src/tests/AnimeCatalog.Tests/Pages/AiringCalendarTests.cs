@@ -460,7 +460,7 @@ public sealed class AiringCalendarTests
         public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_overlay);
 
-        public void InvalidateCatalogOverlay()
+        public void InvalidateCachedReads()
         {
         }
 

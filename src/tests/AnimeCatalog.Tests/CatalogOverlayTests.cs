@@ -249,7 +249,7 @@ public sealed class CatalogOverlayTests
         await service.GetCatalogOverlayAsync();
         var afterFirst = rest.SelectCallCount;
 
-        service.InvalidateCatalogOverlay();
+        service.InvalidateCachedReads();
         await service.GetCatalogOverlayAsync();
 
         Assert.True(rest.SelectCallCount > afterFirst);

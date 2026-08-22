@@ -29,5 +29,6 @@ public interface ICatalogService
     Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Drops the cached overlay so the next read reflects a write that just happened.</summary>
-    void InvalidateCatalogOverlay();
+    void InvalidateCachedReads();
+
 }

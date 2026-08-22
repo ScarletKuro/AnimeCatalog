@@ -286,7 +286,7 @@
     // Only the Supabase half: the AniList week on screen is unaffected by who is signed in.
     private async Task RefreshOverlayAsync()
     {
-        CatalogService.InvalidateCatalogOverlay();
+        CatalogService.InvalidateCachedReads();
         _overlay = await CatalogService.GetCatalogOverlayAsync();
         Rebuild();
         StateHasChanged();
