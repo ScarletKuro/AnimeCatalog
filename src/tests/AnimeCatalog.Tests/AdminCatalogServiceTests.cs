@@ -539,6 +539,21 @@ public sealed class AdminCatalogServiceTests
         public Task<AniListMedia?> GetAnimeByIdAsync(int id, CancellationToken cancellationToken = default)
             => Task.FromResult<AniListMedia?>(_media);
 
+        public Task<AniListPageResult<AniListAiringSchedule>> GetAiringSchedulesAsync(
+            DateTimeOffset windowStartInclusive,
+            DateTimeOffset windowEndExclusive,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
+
+        public Task<AniListPageResult<AniListMedia>> BrowseMediaAsync(
+            AniListBrowseRequest request,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
+
         public Task<IReadOnlyList<AniListMedia>> SearchAnimeAsync(string search, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<AniListMedia>>([]);
 
@@ -592,5 +607,12 @@ public sealed class AdminCatalogServiceTests
 
         public Task<RepositorySnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_snapshot);
+
+        public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(CatalogOverlay.Empty());
+
+        public void InvalidateCatalogOverlay()
+        {
+        }
     }
 }

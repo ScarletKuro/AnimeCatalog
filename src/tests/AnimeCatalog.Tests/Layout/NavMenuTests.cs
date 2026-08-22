@@ -88,7 +88,8 @@ public sealed class NavMenuTests
         Assert.Collection(
             links,
             home => Assert.Equal("Home", home.TextContent),
-            catalog => Assert.Equal("Catalog", catalog.TextContent));
+            catalog => Assert.Equal("Catalog", catalog.TextContent),
+            calendar => Assert.Equal("Calendar", calendar.TextContent));
         Assert.Equal("true", cut.Find("button.nav-toggle").GetAttribute("aria-expanded"));
     }
 
@@ -105,7 +106,7 @@ public sealed class NavMenuTests
 
         var links = cut.FindAll(".nav-drawer__nav a");
         Assert.Equal(
-            new[] { "Home", "Catalog", "Watch next", "Admin", "+ Add" },
+            new[] { "Home", "Catalog", "Calendar", "Watch next", "Admin", "+ Add" },
             links.Select(link => link.TextContent).ToArray());
 
         var addLink = cut.Find("a.nav-drawer__link--action");

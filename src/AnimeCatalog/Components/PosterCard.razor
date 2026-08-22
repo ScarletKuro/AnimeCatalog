@@ -1,6 +1,6 @@
 @* 2:3 poster tile sharing FranchiseCard's poster treatment (scrim, hover zoom, stretched link).
    Also serves as the relation card: a badge carries the relation type and IsExternal links out. *@
-<article class="poster-card @(IsExternal ? "poster-card--external" : null) @(IsDimmed ? "poster-card--dimmed" : null)">
+<article class="poster-card @(IsExternal ? "poster-card--external" : null) @(IsHighlighted ? "poster-card--highlighted" : null) @(IsDimmed ? "poster-card--dimmed" : null)">
     <div class="poster-card__figure">
         @if (!string.IsNullOrWhiteSpace(CoverUrl))
         {
@@ -91,6 +91,15 @@
     /// </summary>
     [Parameter]
     public bool IsDimmed { get; set; }
+
+    /// <summary>
+    /// Rings the tile for something the visitor has a stake in - an archive entry already in the
+    /// catalog. The opposite of <see cref="IsDimmed"/>, and additive to the badge: on a 250-tile
+    /// grid a small pill is not scannable but a border is. Defaults false and emits nothing when
+    /// unset, so every existing caller renders byte-identical markup.
+    /// </summary>
+    [Parameter]
+    public bool IsHighlighted { get; set; }
 
     /// <summary>Top-left pill: a relation type, or "Watching".</summary>
     [Parameter]

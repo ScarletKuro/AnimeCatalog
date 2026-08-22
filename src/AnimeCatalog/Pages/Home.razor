@@ -407,17 +407,15 @@
 
     private int? CommunityScoreFor(AnimeListItemViewModel item) => MediaFor(item)?.AverageScore;
 
-    // Same wording and local-time conversion as the details page's "Next episode" fact.
+    // Same wording and local-time conversion as the details page's "Next episode" fact, which is
+    // why both now go through AiringTimeFormatter rather than each building the string.
     private string? AiringTextFor(AnimeListItemViewModel item)
     {
         var next = MediaFor(item)?.NextAiringEpisode;
-        if (next is null)
-        {
-            return null;
-        }
 
-        var airsAt = DateTimeOffset.FromUnixTimeSeconds(next.AiringAt).ToLocalTime();
-        return $"Episode {next.Episode} on {airsAt:yyyy-MM-dd HH:mm}";
+        return next is null
+            ? null
+            : AiringTimeFormatter.NextEpisodeLine(next.Episode, next.AiringAt);
     }
 
     // The poster tile has no room for the full airing line, so it carries the fact and the card's

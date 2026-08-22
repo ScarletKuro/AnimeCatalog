@@ -729,13 +729,10 @@
         get
         {
             var next = _enrichment?.Media.NextAiringEpisode;
-            if (next is null)
-            {
-                return null;
-            }
 
-            var airsAt = DateTimeOffset.FromUnixTimeSeconds(next.AiringAt).ToLocalTime();
-            return $"Episode {next.Episode} on {airsAt:yyyy-MM-dd HH:mm}";
+            return next is null
+                ? null
+                : AiringTimeFormatter.NextEpisodeLine(next.Episode, next.AiringAt);
         }
     }
 

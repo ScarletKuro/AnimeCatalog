@@ -358,6 +358,13 @@ public sealed class CatalogTransferServiceTests
         public Task<RepositorySnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(snapshot);
 
+        public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(CatalogOverlay.Empty());
+
+        public void InvalidateCatalogOverlay()
+        {
+        }
+
         public Task<IReadOnlyList<FranchiseSummaryViewModel>> GetCatalogAsync(CatalogFilters? filters = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 

@@ -1,0 +1,151 @@
+@* One day of the weekly schedule. Rendered seven times whether or not it has anything in it - the
+   columns come from the week, not from the data, so the grid never reflows as pages arrive. *@
+<section class="@ColumnClass" aria-labelledby="@HeadingId" aria-current="@(IsToday ? "date" : null)">
+    <div class="schedule-day__header">
+        <h3 class="schedule-day__name" id="@HeadingId">@AiringTimeFormatter.DayNameLabel(Date)</h3>
+        <time class="schedule-day__date" datetime="@AiringTimeFormatter.IsoDate(Date)">@AiringTimeFormatter.DayDateLabel(Date)</time>
+
+        @if (IsToday)
+        {
+            @* Colour is never the sole carrier of "today": the chip and aria-current both say it. *@
+            <span class="chip chip--live">Today</span>
+        }
+
+        @* The true count, always - so a collapsed column is honest about what it is hiding. *@
+        <span class="schedule-day__count">
+            @Episodes.Count
+            <span class="sr-only"> episodes</span>
+        </span>
+    </div>
+
+    @if (Episodes.Count == 0)
+    {
+        @if (IsLoading)
+        {
+            @* Placeholder rows rather than an empty note: while the week is still paging in, "nothing
+               airs today" would be a claim the page cannot yet make. Inline markup because skeletons
+               are not a component anywhere in this app. *@
+            <div class="schedule-day__items" aria-hidden="true">
+                @for (var index = 0; index < SkeletonRowCount; index++)
+                {
+                    <article class="schedule-episode schedule-episode--skeleton">
+                        <div class="schedule-episode__poster"></div>
+                        <div class="schedule-episode__body">
+                            <span class="skeleton skeleton--line skeleton--w-8"></span>
+                            <span class="skeleton skeleton--line"></span>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="empty-note">Nothing airs.</p>
+        }
+    }
+    else
+    {
+        <ol class="schedule-day__items" id="@ItemsId">
+            @* An ordered list because the order is the airing time, which is meaningful. *@
+            @foreach (var episode in VisibleEpisodes)
+            {
+                <li>
+                    <ScheduleEpisodeRow AirsAtLocal="episode.AirsAtLocal"
+                                        Title="@episode.Title"
+                                        CoverUrl="@episode.CoverUrl"
+                                        Episode="episode.Episode"
+                                        TotalEpisodes="episode.TotalEpisodes"
+                                        Subtitle="@episode.Subtitle"
+                                        Href="@episode.Href"
+                                        IsExternal="episode.IsExternalHref"
+                                        EpisodesWatched="episode.Catalog?.EpisodesWatched"
+                                        CatalogStatus="episode.CatalogStatus"
+                                        Note="@episode.CatalogNote"
+                                        IsBehind="episode.IsBehind"
+                                        IsDimmed="@IsDimmedRow(episode)" />
+                </li>
+            }
+        </ol>
+
+        @if (HasMore)
+        {
+            <DisclosureButton Expanded="_isExpanded"
+                              CollapsedLabel="@($"Show all {Episodes.Count}")"
+                              ExpandedLabel="Show fewer"
+                              ControlsId="@ItemsId"
+                              OnToggle="Toggle" />
+        }
+    }
+</section>
+
+@code {
+    /// <summary>Rows shown before the disclosure. Matches Franchise.razor's EntryPreviewCount.</summary>
+    public const int DefaultPreviewCount = 12;
+
+    private const int SkeletonRowCount = 3;
+
+    private bool _isExpanded;
+
+    [Parameter, EditorRequired]
+    public required DateOnly Date { get; set; }
+
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<ScheduleEpisodeViewModel> Episodes { get; set; }
+
+    [Parameter]
+    public bool IsToday { get; set; }
+
+    /// <summary>
+    /// Renders placeholder rows instead of the empty note while the week is still paging in, so an
+    /// empty column never claims nothing airs before the answer is known.
+    /// </summary>
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    /// <summary>Rows shown before the disclosure. Zero shows every row.</summary>
+    [Parameter]
+    public int PreviewCount { get; set; } = DefaultPreviewCount;
+
+    /// <summary>Plays down rows that are not in the catalog, without removing them.</summary>
+    [Parameter]
+    public bool DimUncataloged { get; set; }
+
+    // Expansion is private state, never a parameter. That sidesteps the "never write to a
+    // [Parameter]" rule rather than having to obey it, and one column expanding is nothing the
+    // page above needs to know about.
+    private void Toggle() => _isExpanded = !_isExpanded;
+
+    private bool HasMore => PreviewCount > 0 && Episodes.Count > PreviewCount;
+
+    private IEnumerable<ScheduleEpisodeViewModel> VisibleEpisodes =>
+        _isExpanded || !HasMore ? Episodes : Episodes.Take(PreviewCount);
+
+    private bool IsDimmedRow(ScheduleEpisodeViewModel episode) => DimUncataloged && !episode.IsCataloged;
+
+    private string ColumnClass
+    {
+        get
+        {
+            var classes = new List<string> { "schedule-day" };
+
+            if (IsToday)
+            {
+                classes.Add("schedule-day--today");
+            }
+
+            // Only once loading has settled, or an empty column would fade before it has an answer.
+            if (Episodes.Count == 0 && !IsLoading)
+            {
+                classes.Add("schedule-day--empty");
+            }
+
+            return string.Join(' ', classes);
+        }
+    }
+
+    // A bare <section> is not a named region without this, and the names are what make the seven
+    // day regions navigable.
+    private string HeadingId => $"schedule-day-{AiringTimeFormatter.IsoDate(Date)}";
+
+    private string ItemsId => $"schedule-items-{AiringTimeFormatter.IsoDate(Date)}";
+}

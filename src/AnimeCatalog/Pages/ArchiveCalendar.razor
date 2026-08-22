@@ -1,0 +1,507 @@
+@page "/calendar/archive"
+@page "/calendar/archive/{Year:int}/{Season}"
+@implements IDisposable
+@inject IAniListBrowseService BrowseService
+@inject ICatalogService CatalogService
+@inject CalendarService CalendarService
+@inject TimeProvider Clock
+@inject NavigationManager NavigationManager
+@using AnimeCatalog.Models.AniList
+@using System.Globalization
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<AuthStateWatcher OnIdentityChanged="RefreshOverlayAsync" />
+
+<section class="stack stack--wide">
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Calendar</p>
+            <h1>Season archive</h1>
+            <p class="lede">Every season AniList knows about, back to @AnimeSeasonCalendar.MinimumYear — pick a year instead of scrolling for one, a single season, or the whole year at once. Titles already in the catalog are ringed and link straight to their entry.</p>
+        </div>
+    </div>
+
+    <CalendarViewTabs />
+
+    <section class="panel">
+        <div class="panel__header">
+            <div>
+                <h2>@Heading</h2>
+                <p class="schedule-toolbar__status" role="status" aria-live="polite">@StatusText</p>
+            </div>
+
+            <div class="button-row">
+                @* Labelled with the target year, so the buttons describe themselves and need no
+                   icons - consistent with the text-only nav. *@
+                <button type="button" class="button button--ghost" disabled="@(_year <= AnimeSeasonCalendar.MinimumYear)" @onclick="() => GoToYear(_year - 1)">‹ @(_year - 1)</button>
+                <button type="button" class="button button--ghost" disabled="@(_year >= MaximumYear)" @onclick="() => GoToYear(_year + 1)">@(_year + 1) ›</button>
+
+                @if (_isLoading)
+                {
+                    <button type="button" class="button button--ghost" @onclick="CancelLoad">Cancel</button>
+                }
+                else
+                {
+                    <button type="button" class="button button--ghost" @onclick="ReloadAsync">Reload</button>
+                }
+            </div>
+        </div>
+
+        <div class="panel__body">
+            <SeasonPicker Year="_year" />
+
+            @if (_aniListDown)
+            {
+                <ErrorState Title="AniList is unavailable"
+                            Message="@AniListUnavailableException.DefaultMessage"
+                            Retry="ReloadAsync" />
+
+                @if (!string.IsNullOrWhiteSpace(_serverMessage))
+                {
+                    <p class="panel__notice">AniList said: @_serverMessage</p>
+                }
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <p class="panel__notice">AniList stopped answering part-way, so this season may be incomplete. @_error</p>
+                }
+
+                @if (_overlay.ShouldExplainAbsence)
+                {
+                    <p class="panel__notice">@OverlayNotice</p>
+                }
+
+                <div class="filters-card">
+                    <label class="field">
+                        <span class="field-label">Year</span>
+                        @* A native select of about ninety years, newest first. This is the fix for
+                           having to scroll a strip of them: typing "199" jumps into the 1990s, and on
+                           a phone it becomes the platform wheel picker. A custom combobox would be a
+                           from-scratch listbox to pick an integer. *@
+                        <select class="select-input" value="@_year" @onchange="OnYearChanged">
+                            @foreach (var year in AnimeSeasonCalendar.Years(Clock))
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Sort</span>
+                        @* These options are static, unlike the airing week's format list: this filter
+                           goes into the query, so it cannot be derived from an already-filtered set. *@
+                        <select class="select-input" value="@_sort" @onchange="OnSortChanged">
+                            <option value="POPULARITY_DESC">Most popular</option>
+                            <option value="SCORE_DESC">Highest rated</option>
+                            <option value="TRENDING_DESC">Trending</option>
+                            <option value="START_DATE">Earliest start date</option>
+                            <option value="TITLE_ROMAJI">Title</option>
+                            <option value="EPISODES_DESC">Most episodes</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Format</span>
+                        <select class="select-input" value="@_format" @onchange="OnFormatChanged">
+                            <option value="">All formats</option>
+                            <option value="TV">TV</option>
+                            <option value="TV_SHORT">TV Short</option>
+                            <option value="MOVIE">Movie</option>
+                            <option value="OVA">OVA</option>
+                            <option value="ONA">ONA</option>
+                            <option value="SPECIAL">Special</option>
+                            <option value="MUSIC">Music</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Country</span>
+                        <select class="select-input" value="@_country" @onchange="OnCountryChanged">
+                            <option value="">Anywhere</option>
+                            <option value="JP">Japan</option>
+                            <option value="CN">China</option>
+                            <option value="KR">South Korea</option>
+                            <option value="TW">Taiwan</option>
+                        </select>
+                    </label>
+
+                    @if (_overlay.IsDecorating)
+                    {
+                        <label class="field">
+                            <span class="field-label">Catalog</span>
+                            <select class="select-input" value="@_catalogFilter" @onchange="OnCatalogFilterChanged">
+                                <option value="@CatalogHighlightFilter.All">All titles</option>
+                                <option value="@CatalogHighlightFilter.OnlyMine">Only mine</option>
+                                <option value="@CatalogHighlightFilter.DimOthers">Dim others</option>
+                            </select>
+                        </label>
+                    }
+
+                    <label class="field">
+                        <span class="field-label">Adult titles</span>
+                        @* Sent to AniList rather than filtered here, so a page of the ~250 budget is
+                           never spent on entries that will not render. *@
+                        <select class="select-input" value="@(_hideAdult ? "true" : "false")" @onchange="OnHideAdultChanged">
+                            <option value="true">Hidden</option>
+                            <option value="false">Shown</option>
+                        </select>
+                    </label>
+                </div>
+
+                @if (_isLoading && _archive is null)
+                {
+                    <LoadingIndicator Text="@($"Loading {Heading}...")" />
+                }
+                else if (_archive is null or { LoadedCount: 0 })
+                {
+                    <div class="empty-card">
+                        <h3>AniList lists nothing for @Heading.</h3>
+                        <p>Try another year, or widen the format and country filters.</p>
+                    </div>
+                }
+                else if (_archive.Entries.Count == 0)
+                {
+                    <div class="empty-card">
+                        <h3>None of the @_archive.LoadedCount titles match the current filters.</h3>
+                        <p>Switch the catalog filter back to all titles to see the rest.</p>
+                    </div>
+                }
+                else
+                {
+                    @* One band per season for a whole year, one unlabelled band for a single season -
+                       so both shapes render from the same loop rather than duplicating the grid. *@
+                    @foreach (var group in _archive.Groups)
+                    {
+                        <section class="archive-band">
+                            @if (group.Heading is { Length: > 0 } heading)
+                            {
+                                <div class="archive-band__header">
+                                    <h3 class="archive-band__title">@heading</h3>
+                                    <span class="archive-band__count">
+                                        @group.Entries.Count
+                                        <span class="sr-only"> titles</span>
+                                    </span>
+                                </div>
+                            }
+
+                            @* Reuses .poster-grid rather than inventing an archive grid: the whole
+                               season is paged in and rendered, exactly as Catalog.razor renders every
+                               result. Roughly 250 lazy covers is cheap, and a "show more" gate on the
+                               primary content of a browsing page is friction. *@
+                            <div class="poster-grid">
+                                @foreach (var entry in group.Entries)
+                                {
+                                    <PosterCard Title="@entry.Title"
+                                                CoverUrl="@entry.CoverUrl"
+                                                Subtitle="@entry.Subtitle"
+                                                Href="@entry.Href"
+                                                IsExternal="entry.IsExternalHref"
+                                                BadgeText="@entry.CatalogStatus?.ToDisplayLabel()"
+                                                BadgeVariant="@BadgeVariantFor(entry.CatalogStatus)"
+                                                Score="entry.OwnerScore"
+                                                ProgressPercent="entry.ProgressPercent"
+                                                IsHighlighted="entry.IsCataloged"
+                                                IsDimmed="@(_catalogFilter == CatalogHighlightFilter.DimOthers && !entry.IsCataloged)">
+                                        <Footer>
+                                            @* The community score lives here rather than in Score,
+                                               which means the owner's own rating. Same wording as
+                                               WatchNext. *@
+                                            <span>@entry.CommunityScoreLabel</span>
+
+                                            @if (entry.EpisodesWatched is not null)
+                                            {
+                                                <ProgressDisplay EpisodesWatched="entry.EpisodesWatched.Value" TotalEpisodes="entry.Episodes" />
+                                            }
+                                        </Footer>
+                                    </PosterCard>
+                                }
+                            </div>
+                        </section>
+                    }
+                }
+            }
+        </div>
+    </section>
+</section>
+
+@code {
+    [Parameter]
+    public int? Year { get; set; }
+
+    [Parameter]
+    public string? Season { get; set; }
+
+    private int _year;
+    private string _season = AnimeSeasonCalendar.Winter;
+    private string _sort = "POPULARITY_DESC";
+    private string _format = string.Empty;
+    private string _country = string.Empty;
+    private bool _hideAdult = true;
+    private CatalogHighlightFilter _catalogFilter = CatalogHighlightFilter.All;
+
+    private SeasonArchiveViewModel? _archive;
+
+    // The year and season the current load was started for. See OnParametersSetAsync.
+    private string? _requestedKey;
+
+    // Kept so a change to the catalog filter can re-project without re-querying AniList.
+    private List<AniListMedia> _loadedMedia = [];
+    private CatalogOverlay _overlay = CatalogOverlay.Empty();
+    private CancellationTokenSource? _cts;
+
+    private bool _isLoading = true;
+    private bool _aniListDown;
+    private string? _error;
+    private string? _serverMessage;
+
+    // Re-fires on same-component navigation, which is how the season links work.
+    protected override Task OnParametersSetAsync()
+    {
+        var (currentYear, currentSeason) = AnimeSeasonCalendar.Current(Clock);
+
+        // Normalised defensively even though the router nulls unmatched optional parameters: a stale
+        // Year surviving a navigation back to /calendar/archive would show the wrong season under the
+        // right heading, which is worse than being wrong loudly.
+        var requestedYear = Math.Clamp(Year ?? currentYear, AnimeSeasonCalendar.MinimumYear, MaximumYear);
+        var requestedSeason = AnimeSeasonCalendar.Normalise(Season) ?? currentSeason;
+
+        // The season picker marks itself active off the URL, so a bare /calendar/archive - or a route
+        // carrying a season this page had to correct - would render a heading of "Summer 2026" with
+        // nothing highlighted below it. Putting the resolved season in the address fixes that and
+        // makes the landing page shareable. Replaces rather than pushes, so Back still leaves the
+        // archive instead of bouncing off the redirect.
+        if (Year != requestedYear || !string.Equals(Season, AnimeSeasonCalendar.ToRouteSlug(requestedSeason), StringComparison.Ordinal))
+        {
+            NavigationManager.NavigateTo(RouteFor(requestedYear, requestedSeason), replace: true);
+        }
+
+        // Keyed on what was asked for rather than on whether a result arrived, because the redirect
+        // above brings this method straight back round with the same season: guarding on _archive
+        // would let the second pass start a duplicate load while the first was still in flight.
+        var requestedKey = $"{requestedYear}|{requestedSeason}";
+
+        if (_requestedKey == requestedKey)
+        {
+            return Task.CompletedTask;
+        }
+
+        _requestedKey = requestedKey;
+        _year = requestedYear;
+        _season = requestedSeason;
+
+        return LoadAsync();
+    }
+
+    private int MaximumYear => AnimeSeasonCalendar.MaximumYear(Clock);
+
+    // A whole-year browse is titled by the year alone; the season bands below name themselves.
+    private string Heading => AnimeSeasonCalendar.IsWholeYear(_season)
+        ? _year.ToString(CultureInfo.InvariantCulture)
+        : $"{MediaDisplayFormatter.SeasonLabel(_season)} {_year}";
+
+    private string PageTitleText => $"{Heading} · Archive · Anime Catalog";
+
+    private Task ReloadAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        _isLoading = true;
+        _error = null;
+        _aniListDown = false;
+        _serverMessage = null;
+        _archive = null;
+
+        var overlayTask = CatalogService.GetCatalogOverlayAsync(token);
+
+        var request = new AniListBrowseRequest
+        {
+            SeasonYear = _year,
+            // The whole-year option is not a MediaSeason: a null here makes JsonDefaults.Web drop the
+            // property, which makes GraphQL skip the argument, which is what "no season filter" means.
+            Season = AnimeSeasonCalendar.IsWholeYear(_season) ? null : _season,
+            Sort = _sort,
+            Formats = string.IsNullOrEmpty(_format) ? [] : [_format],
+            CountryOfOrigin = string.IsNullOrEmpty(_country) ? null : _country,
+            IsAdult = _hideAdult ? false : null
+        };
+
+        var media = new List<AniListMedia>();
+        _loadedMedia = media;
+
+        try
+        {
+            _overlay = await overlayTask;
+
+            for (var page = 1; page <= AniListBrowseService.MaxBrowsePages; page++)
+            {
+                var result = await BrowseService.GetBrowsePageAsync(request, page, token);
+                media.AddRange(result.Items);
+
+                // Rebuilt after every page so the grid grows into place instead of appearing whole
+                // after five paced requests. Existing tiles never move: the grid only appends.
+                Rebuild(media);
+                await InvokeAsync(StateHasChanged);
+
+                if (!result.HasNextPage)
+                {
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Keeps whatever pages already landed.
+        }
+        catch (AniListUnavailableException ex) when (media.Count == 0)
+        {
+            _aniListDown = true;
+            _serverMessage = ex.ServerMessage;
+        }
+        catch (Exception ex) when (media.Count > 0)
+        {
+            // Half a season on screen beats an error card, so a later failure only annotates.
+            _error = ex is AniListUnavailableException
+                ? AniListUnavailableException.DefaultMessage
+                : ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+            Rebuild(media);
+
+            if (_cts is not null && !_cts.IsCancellationRequested)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void Rebuild(IReadOnlyList<AniListMedia> media) =>
+        _archive = CalendarService.BuildArchive(_year, _season, media, _overlay, _catalogFilter);
+
+    // Only the Supabase half. Signing in changes which tiles are ringed, not which titles the season
+    // contains, so the already-loaded media is re-projected rather than re-queried - the browse cache
+    // would probably absorb it, but spending a request to learn nothing changed is still wrong.
+    private async Task RefreshOverlayAsync()
+    {
+        CatalogService.InvalidateCatalogOverlay();
+        _overlay = await CatalogService.GetCatalogOverlayAsync();
+
+        Rebuild(_loadedMedia);
+        StateHasChanged();
+    }
+
+    private void CancelLoad()
+    {
+        _cts?.Cancel();
+        _isLoading = false;
+    }
+
+    private void GoToYear(int year) => Navigate(Math.Clamp(year, AnimeSeasonCalendar.MinimumYear, MaximumYear), _season);
+
+    private void OnYearChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var year))
+        {
+            GoToYear(year);
+        }
+    }
+
+    // Navigating rather than reloading in place, so Back walks through the seasons a visitor viewed.
+    private void Navigate(int year, string season) => NavigationManager.NavigateTo(RouteFor(year, season));
+
+    private static string RouteFor(int year, string season) =>
+        $"calendar/archive/{year}/{AnimeSeasonCalendar.ToRouteSlug(season)}";
+
+    // The remaining filters go into the query, so each change restarts the load. No debounce, because
+    // there is none anywhere in this app and these are discrete selects rather than typing.
+    private Task OnSortChanged(ChangeEventArgs args)
+    {
+        _sort = args.Value?.ToString() ?? "POPULARITY_DESC";
+        return LoadAsync();
+    }
+
+    private Task OnFormatChanged(ChangeEventArgs args)
+    {
+        _format = args.Value?.ToString() ?? string.Empty;
+        return LoadAsync();
+    }
+
+    private Task OnCountryChanged(ChangeEventArgs args)
+    {
+        _country = args.Value?.ToString() ?? string.Empty;
+        return LoadAsync();
+    }
+
+    private Task OnHideAdultChanged(ChangeEventArgs args)
+    {
+        _hideAdult = !bool.TryParse(args.Value?.ToString(), out var value) || value;
+        return LoadAsync();
+    }
+
+    // Catalog highlighting is the one client-side filter here: the overlay is already in memory, so
+    // re-querying AniList for it would spend five paced requests just to get back a subset.
+    private void OnCatalogFilterChanged(ChangeEventArgs args)
+    {
+        _catalogFilter = Enum.TryParse<CatalogHighlightFilter>(args.Value?.ToString(), out var value)
+            ? value
+            : CatalogHighlightFilter.All;
+
+        Rebuild(_loadedMedia);
+    }
+
+    private string StatusText
+    {
+        get
+        {
+            if (_isLoading)
+            {
+                return _archive is { LoadedCount: > 0 }
+                    ? $"Loaded {_archive.LoadedCount} titles so far."
+                    : AnimeSeasonCalendar.IsWholeYear(_season)
+                        ? "Loading the whole year. A year is four seasons, so this takes a while - results appear as they arrive."
+                        : "Loading the season.";
+            }
+
+            if (_archive is null or { LoadedCount: 0 })
+            {
+                return "Nothing listed.";
+            }
+
+            return _archive.Entries.Count == _archive.LoadedCount
+                ? $"{_archive.LoadedCount} titles."
+                : $"{_archive.Entries.Count} of {_archive.LoadedCount} titles match the filters.";
+        }
+    }
+
+    private string OverlayNotice => _overlay.State == CatalogAccessState.Private
+        ? "Catalog highlighting is off: this catalog is private for you. Sign in as the owner to see which of these you already track."
+        : "Catalog highlighting is unavailable right now, so nothing below is marked as yours.";
+
+    private static string BadgeVariantFor(CatalogStatus? status) => status switch
+    {
+        CatalogStatus.Watching => "live",
+        CatalogStatus.Completed => "neutral",
+        CatalogStatus.Planned or CatalogStatus.OnHold => "warm",
+        CatalogStatus.Dropped => "danger",
+        _ => "neutral"
+    };
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

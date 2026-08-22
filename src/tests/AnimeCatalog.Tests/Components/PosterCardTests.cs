@@ -198,4 +198,47 @@ public sealed class PosterCardTests
 
         Assert.Contains("28 eps", cut.Find(".poster-card__footer").InnerHtml);
     }
+
+    // Guards the property every existing caller relies on: adding the archive's highlight ring must
+    // leave the markup of a card that does not ask for it completely unchanged.
+    [Fact]
+    public void Highlight_IsOptIn_AndDefaultsOff()
+    {
+        using var context = new BunitContext();
+
+        var cut = context.Render<PosterCard>(parameters => parameters
+            .Add(p => p.Title, "Frieren"));
+
+        Assert.DoesNotContain("poster-card--highlighted", cut.Find(".poster-card").ClassList);
+    }
+
+    [Fact]
+    public void Highlight_RingsTheTileWhenAskedFor()
+    {
+        using var context = new BunitContext();
+
+        var cut = context.Render<PosterCard>(parameters => parameters
+            .Add(p => p.Title, "Frieren")
+            .Add(p => p.IsHighlighted, true));
+
+        Assert.Contains("poster-card--highlighted", cut.Find(".poster-card").ClassList);
+    }
+
+    // Highlighted and dimmed are opposites, but they are independent flags and the archive sets them
+    // from different inputs, so neither may swallow the other.
+    [Fact]
+    public void HighlightAndDim_AreIndependent()
+    {
+        using var context = new BunitContext();
+
+        var cut = context.Render<PosterCard>(parameters => parameters
+            .Add(p => p.Title, "Frieren")
+            .Add(p => p.IsHighlighted, true)
+            .Add(p => p.IsDimmed, true));
+
+        var classes = cut.Find(".poster-card").ClassList;
+
+        Assert.Contains("poster-card--highlighted", classes);
+        Assert.Contains("poster-card--dimmed", classes);
+    }
 }

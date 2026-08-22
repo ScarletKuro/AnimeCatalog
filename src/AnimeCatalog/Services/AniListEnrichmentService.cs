@@ -1,3 +1,4 @@
+using AnimeCatalog.Infrastructure;
 using AnimeCatalog.Models.AniList;
 
 namespace AnimeCatalog.Services;
@@ -14,7 +15,10 @@ namespace AnimeCatalog.Services;
 /// Three properties matter here, because every call is made from the visitor's own browser against
 /// a per-IP rate limit that is currently far below AniList's documented 90 req/min:
 /// requests for the same id are collapsed into one in-flight task; ids are batched 50 at a time;
-/// and HTTP calls are serialised so opening a 30-entry franchise cannot burst the limit.
+/// and HTTP calls are paced by the shared <see cref="AniListRequestPacer"/> so opening a 30-entry
+/// franchise cannot burst the limit. That pacer is shared with every other AniList caller rather
+/// than owned here, so a calendar load and an enrichment burst queue behind each other instead of
+/// racing into a 429.
 /// Failures are cached briefly and surfaced as null rather than thrown, so a page never breaks
 /// because AniList is unavailable.
 /// </para>
@@ -28,25 +32,19 @@ public sealed class AniListEnrichmentService : IAniListEnrichmentService
     private static readonly TimeSpan FailureTtl = TimeSpan.FromMinutes(2);
 
     private readonly IAniListService _aniListService;
+    private readonly AniListRequestPacer _requestPacer;
     private readonly TimeProvider _timeProvider;
     private readonly Dictionary<int, CacheEntry> _cache = [];
     private readonly Dictionary<int, Task<AniListMedia?>> _inFlight = [];
-    private readonly SemaphoreSlim _requestGate = new(1, 1);
-
-    /// <summary>AniList allows 30 requests a minute, so one every two seconds stays just inside it.</summary>
-    public static readonly TimeSpan DefaultRequestSpacing = TimeSpan.FromMilliseconds(2100);
-
-    private readonly TimeSpan _minRequestSpacing;
-    private DateTimeOffset _nextRequestAt = DateTimeOffset.MinValue;
 
     public AniListEnrichmentService(
         IAniListService aniListService,
-        TimeProvider? timeProvider = null,
-        TimeSpan? minRequestSpacing = null)
+        AniListRequestPacer requestPacer,
+        TimeProvider? timeProvider = null)
     {
         _aniListService = aniListService;
+        _requestPacer = requestPacer;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _minRequestSpacing = minRequestSpacing ?? DefaultRequestSpacing;
     }
 
     public async Task<AniListMedia?> GetAsync(int aniListId, CancellationToken cancellationToken = default)
@@ -124,23 +122,17 @@ public sealed class AniListEnrichmentService : IAniListEnrichmentService
         {
             foreach (var chunk in Chunk(ids, AniListService.MaxBatchSize))
             {
-                // Serialised so a large franchise issues its batches one after another rather than
-                // firing every chunk at once into a rate limit we share with the whole page.
-                await _requestGate.WaitAsync(cancellationToken);
+                // Paced so a large franchise issues its batches one after another rather than
+                // firing every chunk at once into a rate limit we share with the whole page - and
+                // with every other AniList caller, which is why the pacer is injected rather than
+                // owned here.
+                var media = await _requestPacer.RunAsync(
+                    token => _aniListService.GetEnrichedAnimeByIdsAsync(chunk, token),
+                    cancellationToken);
 
-                try
+                foreach (var item in media)
                 {
-                    await PaceAsync(cancellationToken);
-
-                    var media = await _aniListService.GetEnrichedAnimeByIdsAsync(chunk, cancellationToken);
-                    foreach (var item in media)
-                    {
-                        fetched[item.Id] = item;
-                    }
-                }
-                finally
-                {
-                    _requestGate.Release();
+                    fetched[item.Id] = item;
                 }
             }
         }
@@ -164,7 +156,7 @@ public sealed class AniListEnrichmentService : IAniListEnrichmentService
         var now = _timeProvider.GetUtcNow();
 
         // AniList returns batched media ordered by id, not in the order they were requested, so
-        // results are matched by id throughout — never by position.
+        // results are matched by id throughout - never by position.
         foreach (var (id, completion) in claimed)
         {
             var media = fetched.GetValueOrDefault(id);
@@ -177,34 +169,6 @@ public sealed class AniListEnrichmentService : IAniListEnrichmentService
             _inFlight.Remove(id);
             completion.TrySetResult(media);
         }
-    }
-
-    /// <summary>
-    /// Holds outgoing requests to AniList's documented ceiling.
-    /// </summary>
-    /// <remarks>
-    /// A bulk walk of the relation graph issues dozens of batches back to back and would otherwise
-    /// trip the 30/min limit part-way through, turning whole batches into cached failures and silently
-    /// dropping results. Spacing them is cheaper than recovering from a 429, and it only applies to
-    /// calls that actually reach the network — cache hits never get here.
-    /// </remarks>
-    private async Task PaceAsync(CancellationToken cancellationToken)
-    {
-        if (_minRequestSpacing <= TimeSpan.Zero)
-        {
-            return;
-        }
-
-        var now = _timeProvider.GetUtcNow();
-        var wait = _nextRequestAt - now;
-
-        if (wait > TimeSpan.Zero)
-        {
-            await Task.Delay(wait, _timeProvider, cancellationToken);
-            now = _timeProvider.GetUtcNow();
-        }
-
-        _nextRequestAt = now + _minRequestSpacing;
     }
 
     private static IEnumerable<List<int>> Chunk(List<int> ids, int size)

@@ -220,6 +220,21 @@ public sealed class AdminAuthChangeTests
         public Task<AniListMedia?> GetAnimeByIdAsync(int id, CancellationToken cancellationToken = default)
             => Task.FromResult<AniListMedia?>(null);
 
+        public Task<AniListPageResult<AniListAiringSchedule>> GetAiringSchedulesAsync(
+            DateTimeOffset windowStartInclusive,
+            DateTimeOffset windowEndExclusive,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
+
+        public Task<AniListPageResult<AniListMedia>> BrowseMediaAsync(
+            AniListBrowseRequest request,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
+
         public Task<AniListMedia?> GetEnrichedAnimeByIdAsync(int id, CancellationToken cancellationToken = default)
             => Task.FromResult<AniListMedia?>(null);
 

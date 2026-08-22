@@ -251,6 +251,21 @@ public sealed class AnimeSearchTests
             throw new NotSupportedException();
         }
 
+        public Task<AniListPageResult<AniListAiringSchedule>> GetAiringSchedulesAsync(
+            DateTimeOffset windowStartInclusive,
+            DateTimeOffset windowEndExclusive,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
+
+        public Task<AniListPageResult<AniListMedia>> BrowseMediaAsync(
+            AniListBrowseRequest request,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
+
         public Task<AniListMedia?> GetEnrichedAnimeByIdAsync(int id, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
@@ -289,6 +304,13 @@ public sealed class AnimeSearchTests
         public Task<AnimeEditorModel?> GetEditorModelAsync(long id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<RepositorySnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(CatalogOverlay.Empty());
+
+        public void InvalidateCatalogOverlay()
+        {
+        }
     }
 
     private sealed class StubSupabaseRestService : ISupabaseRestService

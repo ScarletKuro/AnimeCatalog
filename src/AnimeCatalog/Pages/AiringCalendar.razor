@@ -1,0 +1,396 @@
+@page "/calendar"
+@implements IDisposable
+@inject IAniListBrowseService BrowseService
+@inject ICatalogService CatalogService
+@inject CalendarService CalendarService
+@inject TimeProvider Clock
+
+<PageTitle>Airing week · Anime Catalog</PageTitle>
+
+@* Outside every conditional, as always. Its handler refreshes only the overlay: signing in must not
+   re-spend five to seven AniList requests on a week that is already on screen. *@
+<AuthStateWatcher OnIdentityChanged="RefreshOverlayAsync" />
+
+<section class="stack stack--wide calendar-wide">
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Calendar</p>
+            <h1>What airs this week</h1>
+            <p class="lede">Every episode airing, day by day, in your own time zone. Titles already in the catalog carry your progress, so catching up is one glance rather than a search.</p>
+        </div>
+    </div>
+
+    <CalendarViewTabs />
+
+    <section class="panel">
+        <div class="panel__header">
+            <div>
+                <h2>Airing schedule</h2>
+                <p class="schedule-toolbar__range">@AiringTimeFormatter.WeekRangeLabel(_week.StartDate)</p>
+            </div>
+
+            <div class="button-row">
+                <button type="button" class="button button--ghost" @onclick="GoToPreviousWeekAsync">‹ Previous</button>
+                <button type="button" class="button button--ghost" disabled="@IsCurrentWeek" @onclick="GoToCurrentWeekAsync">This week</button>
+                <button type="button" class="button button--ghost" @onclick="GoToNextWeekAsync">Next ›</button>
+
+                @if (_isLoading)
+                {
+                    <button type="button" class="button button--ghost" @onclick="CancelLoad">Cancel</button>
+                }
+                else
+                {
+                    <button type="button" class="button button--ghost" @onclick="ReloadAsync">Reload</button>
+                }
+            </div>
+        </div>
+
+        <div class="panel__body">
+            @* The page's only live region. The grid itself is deliberately not live: three hundred
+               insertions into one would be a screen-reader denial of service. A percentage would also
+               be dishonest, because pageInfo.total reports a bogus 5000 on page one - so the only
+               truthful number is what has actually landed. *@
+            <p class="schedule-toolbar__status" role="status" aria-live="polite">@StatusText</p>
+
+            @if (_aniListDown)
+            {
+                <ErrorState Title="AniList is unavailable"
+                            Message="@AniListUnavailableException.DefaultMessage"
+                            Retry="ReloadAsync" />
+
+                @if (!string.IsNullOrWhiteSpace(_serverMessage))
+                {
+                    <p class="panel__notice">AniList said: @_serverMessage</p>
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <ErrorState Title="The schedule failed to load" Message="@_error" Retry="ReloadAsync" />
+            }
+            else
+            {
+                @if (_weekView?.WasTruncated == true)
+                {
+                    <p class="panel__notice">
+                        Stopped after @AniListBrowseService.MaxAiringPages pages of results@(CompleteThroughText), so later in the week may be missing.
+                    </p>
+                }
+                else if (_weekView?.DegradedMessage is { Length: > 0 } degraded)
+                {
+                    <p class="panel__notice">AniList stopped answering part-way@(CompleteThroughText). @degraded</p>
+                }
+
+                @if (_overlay.ShouldExplainAbsence)
+                {
+                    @* No PrivateCatalogState here, deliberately: that component takes over the page,
+                       and this page's point is the public AniList grid. Only the highlighting is
+                       missing, so only the highlighting is explained. *@
+                    <p class="panel__notice">@OverlayNotice</p>
+                }
+
+                <div class="filters-card">
+                    <label class="field">
+                        <span class="field-label">Search</span>
+                        <input class="text-input" placeholder="Title..." value="@_filters.Query" @oninput="OnQueryChanged" />
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Format</span>
+                        @* Options come from what actually loaded, the same way WatchNext builds its
+                           format list - these filters run client-side over the loaded week. *@
+                        <select class="select-input" value="@_filters.Format" @onchange="OnFormatChanged">
+                            <option value="">All formats</option>
+                            @foreach (var format in AvailableFormats)
+                            {
+                                <option value="@format">@MediaDisplayFormatter.FormatLabel(format)</option>
+                            }
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Country</span>
+                        <select class="select-input" value="@_filters.Country" @onchange="OnCountryChanged">
+                            <option value="">Anywhere</option>
+                            <option value="JP">Japan</option>
+                            <option value="CN">China</option>
+                            <option value="KR">South Korea</option>
+                            <option value="TW">Taiwan</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Shorts</span>
+                        <select class="select-input" value="@(_filters.HideShorts ? "true" : "false")" @onchange="OnHideShortsChanged">
+                            <option value="false">Show shorts</option>
+                            <option value="true">Hide shorts</option>
+                        </select>
+                    </label>
+
+                    @if (_overlay.IsDecorating)
+                    {
+                        @* Absent rather than disabled when there is no overlay: a control that cannot
+                           do anything is worse than no control. *@
+                        <label class="field">
+                            <span class="field-label">Catalog</span>
+                            <select class="select-input" value="@_filters.Catalog" @onchange="OnCatalogFilterChanged">
+                                <option value="@CatalogHighlightFilter.All">All titles</option>
+                                <option value="@CatalogHighlightFilter.OnlyMine">Only mine</option>
+                                <option value="@CatalogHighlightFilter.DimOthers">Dim others</option>
+                            </select>
+                        </label>
+                    }
+
+                    <label class="field">
+                        <span class="field-label">Adult titles</span>
+                        <select class="select-input" value="@(_filters.HideAdult ? "true" : "false")" @onchange="OnHideAdultChanged">
+                            <option value="true">Hidden</option>
+                            <option value="false">Shown</option>
+                        </select>
+                    </label>
+                </div>
+
+                @* Seven columns, always, rendered before a single episode arrives. Only their
+                   contents grow, so a ten-second load never reflows the grid. *@
+                <div class="schedule-week">
+                    @foreach (var day in Days)
+                    {
+                        <ScheduleDayColumn Date="day.Date"
+                                           Episodes="day.Episodes"
+                                           IsToday="day.IsToday"
+                                           IsLoading="_isLoading"
+                                           DimUncataloged="@(_filters.Catalog == CatalogHighlightFilter.DimOthers)" />
+                    }
+                </div>
+
+                @if (!_isLoading && _weekView is { LoadedEpisodeCount: > 0, VisibleEpisodeCount: 0 })
+                {
+                    <div class="empty-card">
+                        <h3>No episodes match the current filters.</h3>
+                        <p>Try clearing the search box, showing shorts, or widening the country filter.</p>
+                    </div>
+                }
+            }
+        </div>
+    </section>
+</section>
+
+@code {
+    private readonly AiringWeekFilters _filters = new();
+
+    private AiringWeek _week = null!;
+    private AiringWeekViewModel? _weekView;
+    private AiringScheduleLoad _load = AiringScheduleLoad.Empty;
+    private CatalogOverlay _overlay = CatalogOverlay.Empty();
+    private CancellationTokenSource? _cts;
+
+    private bool _isLoading = true;
+    private bool _aniListDown;
+    private string? _error;
+    private string? _serverMessage;
+
+    protected override Task OnInitializedAsync()
+    {
+        _week = AiringWeek.Current(Clock);
+        return LoadAsync();
+    }
+
+    private Task GoToPreviousWeekAsync() => GoToWeekAsync(_week.Previous());
+
+    private Task GoToNextWeekAsync() => GoToWeekAsync(_week.Next());
+
+    private Task GoToCurrentWeekAsync() => GoToWeekAsync(AiringWeek.Current(Clock));
+
+    private Task ReloadAsync() => LoadAsync();
+
+    private bool IsCurrentWeek => _week == AiringWeek.Current(Clock);
+
+    private Task GoToWeekAsync(AiringWeek week)
+    {
+        if (week == _week)
+        {
+            return Task.CompletedTask;
+        }
+
+        _week = week;
+        _load = AiringScheduleLoad.Empty;
+        _weekView = null;
+
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        // Cancel-then-recreate is not optional. Three fast clicks on "Next" would otherwise leave
+        // three walks queued on a gate that lets one request past every 2.1 seconds, so the week the
+        // visitor actually wants would land roughly forty seconds late. Cancelling takes effect
+        // during the wait, not just between requests, because the pacer awaits a cancellable delay.
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        _isLoading = true;
+        _error = null;
+        _aniListDown = false;
+        _serverMessage = null;
+
+        // Started before the AniList walk is awaited: the overlay hits Supabase, not the AniList
+        // gate, so it must never sit in front of page one of a ten-second critical path.
+        var overlayTask = CatalogService.GetCatalogOverlayAsync(token);
+
+        try
+        {
+            var progress = new Progress<AiringScheduleLoad>(partial =>
+            {
+                _load = partial;
+                Rebuild();
+                _ = InvokeAsync(StateHasChanged);
+            });
+
+            var zone = Clock.LocalTimeZone;
+
+            var loadTask = BrowseService.GetAiringSchedulesAsync(
+                _week.QueryStart(zone),
+                _week.QueryEnd(zone),
+                progress,
+                token);
+
+            _overlay = await overlayTask;
+            _load = await loadTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelling keeps whatever the last progress report produced, as WatchNext does.
+        }
+        catch (AniListUnavailableException ex)
+        {
+            _aniListDown = true;
+            _serverMessage = ex.ServerMessage;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+            Rebuild();
+
+            if (_cts is not null && !_cts.IsCancellationRequested)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    // Only the Supabase half: the AniList week on screen is unaffected by who is signed in.
+    private async Task RefreshOverlayAsync()
+    {
+        CatalogService.InvalidateCatalogOverlay();
+        _overlay = await CatalogService.GetCatalogOverlayAsync();
+        Rebuild();
+        StateHasChanged();
+    }
+
+    private void CancelLoad()
+    {
+        _cts?.Cancel();
+        _isLoading = false;
+    }
+
+    private void Rebuild() =>
+        _weekView = CalendarService.BuildAiringWeek(
+            _week,
+            Clock.LocalTimeZone,
+            Clock.GetUtcNow(),
+            _load,
+            _overlay,
+            _filters);
+
+    // Falls back to seven empty columns so the grid exists on the very first render, before any
+    // build has happened. This is the anti-reflow contract, not a convenience.
+    private IReadOnlyList<AiringDayViewModel> Days =>
+        _weekView?.Days
+        ?? _week.Days()
+            .Select(date => new AiringDayViewModel { Date = date, Episodes = [] })
+            .ToList();
+
+    private IReadOnlyList<string> AvailableFormats => _weekView?.AvailableFormats ?? [];
+
+    private string StatusText
+    {
+        get
+        {
+            if (_isLoading)
+            {
+                return _weekView is { LoadedEpisodeCount: > 0 }
+                    ? $"Loaded {_weekView.LoadedEpisodeCount} episodes so far. Days fill in as they arrive."
+                    : "Loading the schedule. Days fill in as results arrive.";
+            }
+
+            if (_weekView is null || _weekView.LoadedEpisodeCount == 0)
+            {
+                return "Nothing airs this week.";
+            }
+
+            return _weekView.VisibleEpisodeCount == _weekView.LoadedEpisodeCount
+                ? $"{_weekView.LoadedEpisodeCount} episodes this week."
+                : $"{_weekView.VisibleEpisodeCount} of {_weekView.LoadedEpisodeCount} episodes match the filters.";
+        }
+    }
+
+    // Naming the boundary is the whole point of tracking it: with a time-sorted query, running out of
+    // pages means the END of the week is missing, so Sunday looks empty rather than unknown.
+    private string CompleteThroughText => _weekView?.CompleteThrough is { } through
+        ? $", complete through {AiringTimeFormatter.ClockLabel(TimeZoneInfo.ConvertTime(through, Clock.LocalTimeZone))} on {AiringTimeFormatter.DayNameLabel(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(through, Clock.LocalTimeZone).DateTime))}"
+        : string.Empty;
+
+    private string OverlayNotice => _overlay.State == CatalogAccessState.Private
+        ? "Catalog highlighting is off: this catalog is private for you. Sign in as the owner to see which of these you already track."
+        : "Catalog highlighting is unavailable right now, so nothing below is marked as yours.";
+
+    private void OnQueryChanged(ChangeEventArgs args)
+    {
+        _filters.Query = args.Value?.ToString() ?? string.Empty;
+        Rebuild();
+    }
+
+    private void OnFormatChanged(ChangeEventArgs args)
+    {
+        _filters.Format = args.Value?.ToString() ?? string.Empty;
+        Rebuild();
+    }
+
+    private void OnCountryChanged(ChangeEventArgs args)
+    {
+        _filters.Country = args.Value?.ToString() ?? string.Empty;
+        Rebuild();
+    }
+
+    private void OnHideShortsChanged(ChangeEventArgs args)
+    {
+        _filters.HideShorts = bool.TryParse(args.Value?.ToString(), out var value) && value;
+        Rebuild();
+    }
+
+    private void OnHideAdultChanged(ChangeEventArgs args)
+    {
+        _filters.HideAdult = !bool.TryParse(args.Value?.ToString(), out var value) || value;
+        Rebuild();
+    }
+
+    private void OnCatalogFilterChanged(ChangeEventArgs args)
+    {
+        _filters.Catalog = Enum.TryParse<CatalogHighlightFilter>(args.Value?.ToString(), out var value)
+            ? value
+            : CatalogHighlightFilter.All;
+
+        Rebuild();
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

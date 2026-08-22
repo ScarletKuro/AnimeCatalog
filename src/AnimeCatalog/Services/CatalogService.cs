@@ -7,18 +7,36 @@ namespace AnimeCatalog.Services;
 
 public sealed class CatalogService : ICatalogService
 {
+    /// <summary>
+    /// How long a catalog overlay is reused. Short, because the owner editing an entry should see it
+    /// reflected soon, but long enough that paging weeks back and forth does not re-read the tables
+    /// on every navigation.
+    /// </summary>
+    private static readonly TimeSpan OverlayTtl = TimeSpan.FromMinutes(5);
+
+    /// <summary>A refusal is held briefly so a private catalog is not re-asked on every render.</summary>
+    private static readonly TimeSpan OverlayFailureTtl = TimeSpan.FromMinutes(2);
+
     private readonly ISupabaseRestService _supabaseRestService;
     private readonly FranchiseService _franchiseService;
     private readonly ICatalogAccessService _catalogAccessService;
+    private readonly TimeProvider _timeProvider;
 
+    private CatalogOverlay? _overlay;
+    private DateTimeOffset _overlayExpiresAt = DateTimeOffset.MinValue;
+
+    // TimeProvider is a trailing optional parameter on purpose: DI fills it from the registered
+    // singleton, and the eight existing test call sites that pass three arguments keep compiling.
     public CatalogService(
         ISupabaseRestService supabaseRestService,
         FranchiseService franchiseService,
-        ICatalogAccessService catalogAccessService)
+        ICatalogAccessService catalogAccessService,
+        TimeProvider? timeProvider = null)
     {
         _supabaseRestService = supabaseRestService;
         _franchiseService = franchiseService;
         _catalogAccessService = catalogAccessService;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public bool IsConfigured => _supabaseRestService.IsConfigured;
@@ -32,7 +50,7 @@ public sealed class CatalogService : ICatalogService
     public async Task<HomeSummaryViewModel> GetHomeSummaryAsync(CancellationToken cancellationToken = default)
     {
         var catalog = await GetCatalogAsync(cancellationToken: cancellationToken);
-        return _franchiseService.BuildHomeSummary(catalog, DateTimeOffset.UtcNow);
+        return _franchiseService.BuildHomeSummary(catalog, _timeProvider.GetUtcNow());
     }
 
     public async Task<FranchiseDetailsViewModel?> GetFranchiseAsync(string slug, CancellationToken cancellationToken = default)
@@ -151,6 +169,96 @@ public sealed class CatalogService : ICatalogService
         {
             throw new CatalogAccessDeniedException();
         }
+    }
+
+    /// <summary>
+    /// Maps AniList id to the local entry and its watch progress, for decorating pages whose primary
+    /// data comes from AniList.
+    /// </summary>
+    /// <remarks>
+    /// Unlike every other method on this service, this NEVER throws for a refusal. The calendar's
+    /// AniList half has to render whether or not Supabase is configured, reachable, or readable by
+    /// this visitor, so a refusal arrives as <see cref="CatalogOverlay.State"/> and an empty map.
+    /// Cancellation still propagates - that means the caller navigated away, not that access was
+    /// denied, and caching it as a refusal would poison the next visit.
+    /// </remarks>
+    public async Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsConfigured)
+        {
+            return CatalogOverlay.Empty(CatalogAccessState.NotConfigured);
+        }
+
+        var now = _timeProvider.GetUtcNow();
+
+        if (_overlay is not null && _overlayExpiresAt > now)
+        {
+            return _overlay;
+        }
+
+        try
+        {
+            var snapshot = await GetSnapshotAsync(cancellationToken);
+            return CacheOverlay(Project(snapshot), now, OverlayTtl);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (CatalogAccess.IsPrivateAccessDenied(ex))
+        {
+            return CacheOverlay(CatalogOverlay.Empty(CatalogAccessState.Private), now, OverlayFailureTtl);
+        }
+        catch
+        {
+            return CacheOverlay(CatalogOverlay.Empty(CatalogAccessState.Error), now, OverlayFailureTtl);
+        }
+    }
+
+    /// <summary>Drops the cached overlay so the next read reflects a write that just happened.</summary>
+    public void InvalidateCatalogOverlay()
+    {
+        _overlay = null;
+        _overlayExpiresAt = DateTimeOffset.MinValue;
+    }
+
+    private static CatalogOverlay Project(RepositorySnapshot snapshot)
+    {
+        var catalogByAnimeId = snapshot.CatalogEntries
+            .GroupBy(entry => entry.AnimeEntryId)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        // GroupBy rather than ToDictionary: anime_entries has no uniqueness constraint on
+        // anilist_id, so a duplicate would throw here and take the whole page down over a
+        // decoration. Entries with no AniList counterpart (id 0) cannot be matched at all.
+        var byAniListId = snapshot.AnimeEntries
+            .Where(entry => entry.AniListId > 0)
+            .GroupBy(entry => entry.AniListId)
+            .ToDictionary(group => group.Key, group => ProjectItem(group.First(), catalogByAnimeId));
+
+        return new CatalogOverlay(byAniListId, CatalogAccessState.Available);
+    }
+
+    private static CatalogOverlayItem ProjectItem(
+        AnimeEntry entry,
+        IReadOnlyDictionary<long, CatalogEntry> catalogByAnimeId)
+    {
+        var catalogEntry = catalogByAnimeId.GetValueOrDefault(entry.Id);
+
+        return new CatalogOverlayItem(
+            entry.Id,
+            entry.AniListId,
+            catalogEntry?.Status ?? CatalogStatus.Planned,
+            catalogEntry?.EpisodesWatched ?? 0,
+            catalogEntry?.Score,
+            entry.Episodes);
+    }
+
+    private CatalogOverlay CacheOverlay(CatalogOverlay overlay, DateTimeOffset now, TimeSpan ttl)
+    {
+        _overlay = overlay;
+        _overlayExpiresAt = now + ttl;
+        return overlay;
     }
 
     private static AnimeEntry Map(AnimeEntryRow row) => new()

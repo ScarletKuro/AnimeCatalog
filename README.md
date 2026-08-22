@@ -28,6 +28,11 @@ single admin user owns the catalog, and everyone else reads.
   stats, and the entries you have not watched yet.
 - **Find what is next** — the `Watch next` page ranks unwatched franchise
   entries by AniList score.
+- **See what is airing** — the `Calendar` page lays the week out as seven day
+  columns in your own time zone, and entries you already track carry their status
+  and how many episodes you are behind.
+- **Browse any season** — the same page's `Archive` view walks AniList by year and
+  season, all the way back to 1940, with the titles already in the catalog ringed.
 - **Pull metadata from AniList** — titles, posters, banners, episode counts, and
   descriptions come from the AniList GraphQL API.
 - **Publish or hide** — flip the whole catalog between public and private.

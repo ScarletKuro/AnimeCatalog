@@ -1,0 +1,175 @@
+@using System.Globalization
+
+@* Dense horizontal schedule row: time first, then poster and title. Modelled on .search-result
+   rather than PosterCard - a poster tile overlays its title on the artwork and cannot survive a
+   170px column, whereas this leads with the clock, which is what a schedule is read by. *@
+<article class="@RowClass">
+    <div class="schedule-episode__poster">
+        @if (!string.IsNullOrWhiteSpace(CoverUrl))
+        {
+            @* alt="" deliberately: unlike PosterCard, where the image IS the card, the title is
+               adjacent text here, so naming the cover would announce every row twice. *@
+            <img src="@CoverUrl" alt="" loading="lazy" />
+        }
+        else
+        {
+            <span class="poster-fallback" aria-hidden="true">@Initial</span>
+        }
+    </div>
+
+    <div class="schedule-episode__body">
+        <div class="schedule-episode__head">
+            <time class="schedule-episode__clock" datetime="@AirsAtLocal.ToString("O", CultureInfo.InvariantCulture)">
+                @AiringTimeFormatter.ClockLabel(AirsAtLocal)
+            </time>
+
+            @if (Episode is not null)
+            {
+                <span class="schedule-episode__ep">Ep @Episode</span>
+            }
+        </div>
+
+        @* h4 because the day name above it is an h3. Kept in the DOM in full even though CSS clamps
+           it to two lines, so assistive tech and the tooltip both still get the whole title. *@
+        <h4 class="schedule-episode__title" title="@Title">@Title</h4>
+
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <p class="schedule-episode__meta">@Subtitle</p>
+        }
+
+        @* No score here, deliberately - see the note on the parameters below. *@
+        @if (CatalogStatus is not null)
+        {
+            <div class="schedule-episode__tags">
+                <StatusBadge Status="CatalogStatus.Value" />
+
+                @if (EpisodesWatched is not null)
+                {
+                    <ProgressDisplay EpisodesWatched="EpisodesWatched.Value" TotalEpisodes="TotalEpisodes" />
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Note))
+        {
+            <p class="@NoteClass">@Note</p>
+        }
+    </div>
+
+    @* The only non-visual carrier of the day: sighted readers get it from the column the row is in.
+       Placed after the title so the announcement reads title, then context. *@
+    <span class="sr-only">@AiringTimeFormatter.SpokenAiringLabel(AirsAtLocal)</span>
+
+    @if (!string.IsNullOrWhiteSpace(Href))
+    {
+        @* A sibling of the clamped title, never a child: -webkit-line-clamp turns that element into
+           a -webkit-box, and an absolutely positioned child inside one does not lay out. *@
+        @if (IsExternal)
+        {
+            <a class="schedule-episode__link"
+               href="@Href"
+               target="_blank"
+               rel="noopener noreferrer"
+               aria-label="@($"Open {Title} on AniList (opens in a new tab)")"></a>
+        }
+        else
+        {
+            <NavLink class="schedule-episode__link" href="@Href" aria-label="@($"Open {Title}")"></NavLink>
+        }
+    }
+</article>
+
+@code {
+    /// <summary>
+    /// Airing time already converted to the browser's zone. Passed converted rather than as unix
+    /// seconds so a test can pin it without touching TimeZoneInfo.Local.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public required DateTimeOffset AirsAtLocal { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Title { get; set; }
+
+    [Parameter]
+    public string? CoverUrl { get; set; }
+
+    /// <summary>AniList's episode number. Null for the rare schedule row that carries none.</summary>
+    [Parameter]
+    public int? Episode { get; set; }
+
+    [Parameter]
+    public int? TotalEpisodes { get; set; }
+
+    /// <summary>One-line meta such as "TV · 24 min" - the same role as PosterCard.Subtitle.</summary>
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>Opens <see cref="Href"/> in a new tab instead of routing internally.</summary>
+    [Parameter]
+    public bool IsExternal { get; set; }
+
+    // No score parameter, deliberately. A schedule row answers "is there something to watch" - the
+    // useful fact is how far behind you are, which the note carries. A rating is a verdict on a
+    // finished show, and a series airing this week is usually mid-watch and unscored anyway, so the
+    // chip cost a third of a very tight tag row to say nothing. The archive tiles still show both
+    // scores, where there is room and where a finished season is what you are judging.
+
+    // Nothing here reacts to an episode having already aired, deliberately. Dimming aired rows meant
+    // that on a Saturday six of the seven columns were faded, which carried no information - and it
+    // faded the "3 episodes behind" note along with the row, de-emphasising the one thing on the page
+    // worth acting on. The airing time is on every row; that is enough.
+
+    /// <summary>The "dim instead of hide" affordance, mirroring PosterCard.IsDimmed.</summary>
+    [Parameter]
+    public bool IsDimmed { get; set; }
+
+    /// <summary>
+    /// The owner's catalog status. Non-null also switches the row to its cataloged treatment, which
+    /// is what makes a title you already track findable in a fifty-row column.
+    /// </summary>
+    [Parameter]
+    public CatalogStatus? CatalogStatus { get; set; }
+
+    [Parameter]
+    public int? EpisodesWatched { get; set; }
+
+    /// <summary>The derived catalog line - "3 episodes behind", "Caught up".</summary>
+    [Parameter]
+    public string? Note { get; set; }
+
+    /// <summary>Colours <see cref="Note"/> as a warning rather than a success.</summary>
+    [Parameter]
+    public bool IsBehind { get; set; }
+
+    private string RowClass
+    {
+        get
+        {
+            var classes = new List<string> { "schedule-episode" };
+
+            if (CatalogStatus is not null)
+            {
+                classes.Add("schedule-episode--cataloged");
+            }
+
+            if (IsDimmed)
+            {
+                classes.Add("schedule-episode--dimmed");
+            }
+
+            return string.Join(' ', classes);
+        }
+    }
+
+    private string NoteClass => IsBehind
+        ? "schedule-episode__note schedule-episode__note--behind"
+        : "schedule-episode__note schedule-episode__note--caught-up";
+
+    private string Initial => string.IsNullOrWhiteSpace(Title)
+        ? "?"
+        : Title.Trim()[..1].ToUpperInvariant();
+}

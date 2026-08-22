@@ -1,0 +1,9 @@
+@* Switcher between the two calendar views. Four lines, but extracted so the NavLinkMatch subtlety
+   below is stated once instead of being re-derived - and wrongly - by whoever touches it next. *@
+<nav class="calendar-tabs" aria-label="Calendar views">
+    @* "Airing week" needs Match=All: prefix matching would light it up on /calendar/archive too and
+       both tabs would read as active at once. Same trap as /admin versus /admin/add in NavMenu. The
+       archive link needs no Match, because nothing sits below it. *@
+    <NavLink href="calendar" Match="NavLinkMatch.All" class="calendar-tabs__link">Airing week</NavLink>
+    <NavLink href="calendar/archive" class="calendar-tabs__link">Archive</NavLink>
+</nav>

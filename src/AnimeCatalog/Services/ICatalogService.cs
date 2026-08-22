@@ -21,4 +21,13 @@ public interface ICatalogService
     Task<AnimeEditorModel?> GetEditorModelAsync(long id, CancellationToken cancellationToken = default);
 
     Task<RepositorySnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// AniList-id-keyed view of the catalog, for decorating pages whose primary data is AniList's.
+    /// Never throws for a refusal - see the implementation's remarks.
+    /// </summary>
+    Task<CatalogOverlay> GetCatalogOverlayAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Drops the cached overlay so the next read reflects a write that just happened.</summary>
+    void InvalidateCatalogOverlay();
 }

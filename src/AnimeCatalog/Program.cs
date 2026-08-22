@@ -13,6 +13,9 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddOptions();
 builder.Services.AddSingleton(TimeProvider.System);
+// Singleton, and paired with TimeProvider on purpose: every AniList call in the app has to queue
+// behind the same gate or a calendar load and a home-page enrichment burst collide into a 429.
+builder.Services.AddSingleton<AniListRequestPacer>();
 builder.Services.Configure<SupabaseOptions>(builder.Configuration.GetSection(SupabaseOptions.SectionName));
 builder.Services.Configure<AniListOptions>(builder.Configuration.GetSection(AniListOptions.SectionName));
 
@@ -32,7 +35,10 @@ builder.Services.AddScoped<IAniListService>(sp => sp.GetRequiredService<AniListS
 // Scoped is app-lifetime in WebAssembly, so the enrichment cache survives navigation.
 builder.Services.AddScoped<AniListEnrichmentService>();
 builder.Services.AddScoped<IAniListEnrichmentService>(sp => sp.GetRequiredService<AniListEnrichmentService>());
+builder.Services.AddScoped<AniListBrowseService>();
+builder.Services.AddScoped<IAniListBrowseService>(sp => sp.GetRequiredService<AniListBrowseService>());
 builder.Services.AddScoped<FranchiseService>();
+builder.Services.AddScoped<CalendarService>();
 builder.Services.AddScoped<FranchiseGapService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ICatalogService>(sp => sp.GetRequiredService<CatalogService>());

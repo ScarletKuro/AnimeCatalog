@@ -1,3 +1,4 @@
+using AnimeCatalog.Infrastructure;
 using AnimeCatalog.Models.AniList;
 using AnimeCatalog.Services;
 
@@ -9,7 +10,7 @@ public sealed class AniListEnrichmentServiceTests
     public async Task GetAsync_CachesSuccessSoASecondCallIssuesNoRequest()
     {
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         var first = await service.GetAsync(20);
         var second = await service.GetAsync(20);
@@ -24,7 +25,7 @@ public sealed class AniListEnrichmentServiceTests
     {
         var gate = new TaskCompletionSource();
         var aniList = new RecordingAniListService(ids => ids.Select(Media), gate.Task);
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         var first = service.GetAsync(20);
         var second = service.GetAsync(20);
@@ -40,7 +41,7 @@ public sealed class AniListEnrichmentServiceTests
     public async Task GetManyAsync_ChunksIdsIntoBatchesOfFifty()
     {
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         var ids = Enumerable.Range(1, 120).ToList();
         var results = await service.GetManyAsync(ids);
@@ -55,7 +56,7 @@ public sealed class AniListEnrichmentServiceTests
     public async Task GetManyAsync_RequestsOnlyTheIdsNotAlreadyCached()
     {
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         await service.GetManyAsync([1, 2, 3]);
         await service.GetManyAsync([2, 3, 4]);
@@ -68,7 +69,7 @@ public sealed class AniListEnrichmentServiceTests
     public async Task GetManyAsync_DeduplicatesRepeatedIds()
     {
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         var results = await service.GetManyAsync([7, 7, 7]);
 
@@ -81,7 +82,7 @@ public sealed class AniListEnrichmentServiceTests
     {
         // AniList returns batched media ordered by id, not in the order they were requested.
         var aniList = new RecordingAniListService(ids => ids.OrderByDescending(id => id).Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         var results = await service.GetManyAsync([16498, 21, 154587]);
 
@@ -94,7 +95,7 @@ public sealed class AniListEnrichmentServiceTests
     public async Task GetAsync_ReturnsNullWithoutThrowingWhenAniListFails()
     {
         var aniList = new RecordingAniListService(_ => throw new HttpRequestException("AniList is down"));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         Assert.Null(await service.GetAsync(20));
     }
@@ -108,7 +109,7 @@ public sealed class AniListEnrichmentServiceTests
             ? throw new HttpRequestException("AniList is down")
             : ids.Select(Media));
 
-        var service = new AniListEnrichmentService(aniList, time, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(time, TimeSpan.Zero), time);
 
         Assert.Null(await service.GetAsync(20));
         Assert.Null(await service.GetAsync(20));
@@ -127,7 +128,7 @@ public sealed class AniListEnrichmentServiceTests
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 8, 17, 12, 0, 0, TimeSpan.Zero));
         // A successful call that simply omits the id: AniList genuinely has nothing here.
         var aniList = new RecordingAniListService(_ => []);
-        var service = new AniListEnrichmentService(aniList, time, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(time, TimeSpan.Zero), time);
 
         Assert.Null(await service.GetAsync(999));
         time.Advance(TimeSpan.FromMinutes(3));
@@ -140,7 +141,7 @@ public sealed class AniListEnrichmentServiceTests
     public async Task GetManyAsync_WithNoIdsIssuesNoRequest()
     {
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         Assert.Empty(await service.GetManyAsync([]));
         Assert.Equal(0, aniList.CallCount);
@@ -153,7 +154,7 @@ public sealed class AniListEnrichmentServiceTests
         await cts.CancelAsync();
 
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.Zero);
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         Assert.Null(await service.GetAsync(20, cts.Token));
 
@@ -167,7 +168,7 @@ public sealed class AniListEnrichmentServiceTests
         // A relation-graph walk issues dozens of batches back to back. Without spacing it trips
         // AniList's 30/min limit part-way through and whole batches become cached failures.
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.FromMilliseconds(120));
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.FromMilliseconds(120)));
 
         var started = DateTimeOffset.UtcNow;
         await service.GetManyAsync(Enumerable.Range(1, 120).ToList());
@@ -182,7 +183,7 @@ public sealed class AniListEnrichmentServiceTests
     public async Task GetManyAsync_DoesNotPaceCacheHits()
     {
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
-        var service = new AniListEnrichmentService(aniList, null, TimeSpan.FromSeconds(30));
+        var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.FromSeconds(30)));
 
         await service.GetManyAsync([1]);
 
@@ -238,6 +239,21 @@ public sealed class AniListEnrichmentServiceTests
 
         public Task<AniListMedia?> GetAnimeByIdAsync(int id, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public Task<AniListPageResult<AniListAiringSchedule>> GetAiringSchedulesAsync(
+            DateTimeOffset windowStartInclusive,
+            DateTimeOffset windowEndExclusive,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
+
+        public Task<AniListPageResult<AniListMedia>> BrowseMediaAsync(
+            AniListBrowseRequest request,
+            int page,
+            int perPage,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("This stub does not serve the calendar.");
     }
 
     private sealed class FakeTimeProvider : TimeProvider

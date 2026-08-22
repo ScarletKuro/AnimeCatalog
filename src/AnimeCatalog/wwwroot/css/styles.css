@@ -1538,6 +1538,16 @@
         filter: none;
     }
 
+    /* Gold ring for "this one is already yours". On a 250-tile archive grid the status badge alone
+       is too small to scan for; the border is what the eye actually picks up. Gold rather than the
+       brand cyan because on the calendar cyan already means "today" - see the Calendar section. */
+    .poster-card--highlighted {
+        border-color: rgba(240, 216, 138, 0.3);
+        box-shadow:
+            inset 0 0 0 1px rgba(240, 216, 138, 0.22),
+            var(--shadow-soft);
+    }
+
     /* Stretched link: covers the whole poster so the card itself is the franchise
        link. The toggle button sits outside the poster, so it is never occluded. */
     .franchise-card__link,
@@ -2018,6 +2028,330 @@
 
     .timeline__tags {
         @apply flex flex-wrap items-center gap-2;
+    }
+
+    /* ---- Calendar ---------------------------------------------------------------------------
+       Two views share this section: the airing week (.schedule-*) and the season archive
+       (.season-picker, which reuses .poster-grid for its tiles). .calendar-* is what both use.
+
+       One colour rule runs through all of it, and it is the thing not to break: CYAN
+       (--brand) means "today", GOLD (--brand-warm) means "this one is in your catalog". Two
+       orthogonal facts, two hues, never conflated. A cataloged row airing today shows both,
+       and stays readable because they sit on different properties.
+       ---------------------------------------------------------------------------------------- */
+
+    /* Switcher between /calendar and /calendar/archive. Pills rather than a segmented control,
+       because these are two routes and not two states of one control - which is also why the
+       selected state keys off NavLink's own .active instead of a --selected modifier. */
+    .calendar-tabs {
+        @apply flex flex-wrap gap-2;
+    }
+
+    .calendar-tabs__link,
+    .season-picker__option {
+        @apply rounded-full border px-4 py-2 text-sm font-semibold;
+        border-color: var(--panel-border);
+        color: var(--text-soft);
+        transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+    }
+
+    .calendar-tabs__link:hover,
+    .season-picker__option:hover {
+        border-color: var(--panel-border-strong);
+        color: var(--text);
+    }
+
+    .calendar-tabs__link.active,
+    .season-picker__option.active {
+        border-color: rgba(158, 240, 255, 0.32);
+        color: var(--text-strong);
+        background: rgba(158, 240, 255, 0.1);
+    }
+
+    .calendar-tabs__link:focus-visible,
+    .season-picker__option:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 3px;
+    }
+
+
+    /* One band per season in a whole-year browse. A single-season browse renders exactly one band
+       with no header, so the markup is shared and the grid is not duplicated. */
+    .archive-band {
+        @apply grid gap-3;
+    }
+
+    .archive-band__header {
+        @apply flex flex-wrap items-baseline justify-between gap-2 border-b pb-2;
+        border-color: var(--panel-border);
+    }
+
+    .archive-band__title {
+        @apply m-0 text-[1.05rem] font-bold;
+        color: var(--text-strong);
+    }
+
+    .archive-band__count {
+        @apply text-[0.78rem] font-semibold;
+        color: var(--text-soft);
+        font-variant-numeric: tabular-nums;
+    }
+    .season-picker {
+        @apply flex flex-wrap gap-2;
+    }
+
+    .season-picker__option {
+        @apply px-3.5 py-2 text-[0.82rem];
+    }
+
+    /* Two forms, one boundary. Below xl each day is a full-width section - which also covers the
+       961-1279 band, where seven tracks would be about 130px and unreadable - and at xl they
+       become seven columns. align-items:start so a three-episode Sunday does not stretch into an
+       empty box beside a fifty-episode Saturday. No col-span here, deliberately: see the note on
+       .panel--span-2 about not bundling grid placement into a component class. */
+
+    /* The airing week is the one view in this app that genuinely needs more than the 1320px
+       .main-content allows. Seven columns of that leaves roughly 114px for a title once the poster
+       and padding are taken out, which truncates most of them two words in.
+
+       This breaks out of the parent's measure without MainLayout having to know which route is
+       rendering. It collapses to a no-op on its own: once the viewport is narrower than the parent,
+       the width resolves to the parent's own and the margin to zero. The left and right gaps stay
+       symmetric at every width, and never fall below 1rem.
+
+       Centring deliberately does NOT use `left: 50%` plus a translate. A transform would make this
+       element the containing block for its descendants, and .schedule-day__header relies on
+       position: sticky resolving against the page instead. */
+    .calendar-wide {
+        width: min(1800px, calc(100vw - 2rem));
+        margin-inline: calc((100% - min(1800px, calc(100vw - 2rem))) / 2);
+    }
+    /* Columns are sized, not counted. Seven fixed columns only work above about 1800px of container
+       - below that each one drops under ~250px and the title truncates two words in, which is the
+       whole problem this grid used to have between 1280px and 2K.
+
+       So the day count follows the width instead: about 7 columns on a 2K monitor, 5 at 1320px, 3 on
+       a small laptop, 2 on a tablet, 1 on a phone. Days past the first row wrap onto the next in
+       reading order, so the whole week is still on screen and in sequence - just not always in one
+       line. A column is never narrower than 240px, which makes the cramping structurally impossible
+       rather than something to keep re-tuning.
+
+       This also replaces the old xl: breakpoint entirely: one rule now covers phone through 4K, so
+       the poster and title sizes below need no per-breakpoint variants either. Matches how
+       .franchise-grid and .poster-grid already size themselves. */
+    .schedule-week {
+        @apply grid gap-3;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        align-items: start;
+    }
+
+    /* Lighter than .panel on purpose: seven .panels side by side read as seven separate pages. */
+    .schedule-day {
+        @apply grid content-start gap-2 rounded-[var(--radius-lg)] border p-2.5;
+        border-color: rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .schedule-day--today {
+        border-color: rgba(158, 240, 255, 0.28);
+        background:
+            radial-gradient(circle at top right, rgba(158, 240, 255, 0.1), transparent 26%),
+            rgba(255, 255, 255, 0.02);
+    }
+
+    .schedule-day--empty {
+        opacity: 0.72;
+    }
+
+    /* Sticky in both forms: it keeps the day name in view while scrolling a fifty-row column as
+       well as while scrolling the stacked list. The background is load-bearing rather than
+       decoration - without an opaque fill the rows scroll through the header. The offset is
+       expressed against --sticky-header-height so the 960px block, which redefines that token to
+       3.5rem, adjusts this with no extra rule. z-[1] stays below .site-header's z-10. */
+    .schedule-day__header {
+        @apply sticky z-[1] flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[var(--radius-md)] px-2 py-1.5;
+        top: calc(var(--sticky-header-height) + 0.5rem);
+        background: var(--panel-strong);
+    }
+
+    .schedule-day__name {
+        @apply m-0 text-sm font-bold uppercase tracking-[0.16em];
+        color: var(--text-strong);
+    }
+
+    .schedule-day__date,
+    .schedule-day__count {
+        @apply text-[0.72rem];
+        color: var(--text-soft);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Pushed right so the count sits at the far edge whatever the day name's length. */
+    .schedule-day__count {
+        @apply ml-auto font-semibold;
+    }
+
+    .schedule-day__items {
+        @apply m-0 grid list-none gap-2 p-0;
+    }
+
+    /* One grid at every width; only the poster track changes. Everything to its right is a flex
+       column whose rows wrap, which is what lets a 170px column and a 900px section share this
+       markup instead of needing two components. */
+    /* One poster size at every width, which the sized columns above make safe: the narrowest a column
+       ever gets is 240px, leaving about 142px for the title even then. A 40px thumbnail was spending
+       a quarter of the text budget without being identifiable; 72px is a real cover. */
+    .schedule-episode {
+        @apply relative grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2.5 rounded-[var(--radius-md)] border p-2;
+        align-items: start;
+        border-color: rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.025);
+        transition: border-color 150ms ease;
+    }
+
+    .schedule-episode:hover {
+        border-color: rgba(158, 240, 255, 0.22);
+    }
+
+    /* The filter the visitor did choose, so it can go further. Copied from .poster-card--dimmed
+       including the focus restore, and for the same reason: never leave a keyboard user squinting
+       at the row they just tabbed onto. */
+    .schedule-episode--dimmed {
+        opacity: 0.42;
+        filter: saturate(0.55);
+        transition: opacity 160ms ease, filter 160ms ease;
+    }
+
+    .schedule-episode--dimmed:hover,
+    .schedule-episode--dimmed:focus-within {
+        opacity: 1;
+        filter: none;
+    }
+
+    /* Gold, never cyan - cyan is "today" on this page. Same treatment as .poster-card--highlighted
+       so the archive and the week speak one visual language. */
+    .schedule-episode--cataloged {
+        border-color: rgba(240, 216, 138, 0.3);
+        box-shadow: inset 0 0 0 1px rgba(240, 216, 138, 0.2);
+    }
+
+    /* No aspect-ratio here, for exactly the reason spelled out on .search-result__poster: a ratio
+       plus height:100% lets the ratio derive a WIDTH from the grown row height, and the artwork
+       slides out from under its column once the meta pills wrap. Pinning to the track and letting
+       object-cover crop is what keeps it in place. */
+    /* Height is set explicitly rather than with aspect-ratio. The width is already pinned by the
+       row's grid track, so a fixed height is equivalent - and it stays clear of the trap documented
+       on .search-result__poster, where aspect-ratio combined with a stretched height let the ratio
+       derive a WIDTH from the grown row height and slid the artwork out of its own column. Each
+       height here is its track width x 1.5, so the cover keeps its 2:3 proportions.
+
+       align-items: start on the row is what stops the poster stretching to the row instead. */
+    .schedule-episode__poster {
+        @apply h-[6.75rem] w-full overflow-hidden rounded-[10px];
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    }
+
+    .schedule-episode__poster img {
+        @apply h-full w-full object-cover;
+        object-position: center top;
+    }
+
+    .schedule-episode__poster .poster-fallback {
+        @apply grid h-full w-full place-items-center text-sm;
+    }
+
+    .schedule-episode__body {
+        @apply flex min-w-0 flex-col gap-1;
+    }
+
+    .schedule-episode__head {
+        @apply flex flex-wrap items-center gap-x-2 gap-y-1;
+    }
+
+    .schedule-episode__clock {
+        @apply text-[0.8rem] font-bold;
+        color: var(--brand);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .schedule-episode__ep {
+        @apply text-[0.72rem] font-semibold uppercase tracking-[0.12em];
+        color: var(--text-soft);
+    }
+
+    /* Clamped to two lines: a 170px column at xl fits roughly thirteen characters a line. The full
+       title stays in the DOM, so assistive tech and the tooltip both still have all of it. */
+    .schedule-episode__title {
+        @apply m-0 text-[0.85rem] font-semibold leading-5;
+        color: var(--text-strong);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .schedule-episode__meta {
+        @apply m-0 truncate text-[0.72rem];
+        color: var(--text-soft);
+    }
+
+    .schedule-episode__tags {
+        @apply flex flex-wrap items-center gap-1.5;
+    }
+
+    /* The shared display components shrink in this context, the same way
+       .franchise-entry-list--compact shrinks them in its own rows. */
+    .schedule-episode__tags .status-badge,
+    .schedule-episode__tags .progress-display {
+        @apply px-1.5 py-0.5 text-[0.68rem];
+    }
+
+    .schedule-episode__note {
+        @apply m-0 text-[0.72rem] font-semibold;
+        color: var(--text-soft);
+    }
+
+    .schedule-episode__note--behind {
+        color: var(--warning);
+    }
+
+    .schedule-episode__note--caught-up {
+        color: var(--success);
+    }
+
+    /* A sibling of __title, never a child: -webkit-line-clamp turns that element into a
+       -webkit-box, and an absolutely positioned child inside one does not lay out at all. */
+    .schedule-episode__link {
+        @apply absolute inset-0 z-[2];
+        border-radius: inherit;
+    }
+
+    .schedule-episode__link:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: -3px;
+    }
+
+    /* Placeholder rows while the week pages in. Three per column is close enough to the height of
+       the real thing that the settle is mild rather than a jump. */
+    .schedule-episode--skeleton {
+        @apply items-center;
+        pointer-events: none;
+    }
+
+    /* The week's own toolbar row: navigation on one side, the honest count on the other. */
+    .schedule-toolbar {
+        @apply flex flex-wrap items-center justify-between gap-3;
+    }
+
+    .schedule-toolbar__range {
+        @apply m-0 text-sm font-semibold;
+        color: var(--text-strong);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .schedule-toolbar__status {
+        @apply m-0 text-sm;
+        color: var(--text-soft);
     }
 
     .franchise-picker {
@@ -3419,6 +3753,29 @@
     .status-bar__legend {
         @apply gap-2;
     }
+
+    /* The seven-column form is an xl: variant, so nothing here has to restore columns - this block
+       only trims. The sticky day header needs no rule either: its offset is a calc() over
+       --sticky-header-height, which this block already redefines to 3.5rem. */
+    .schedule-day {
+        @apply p-2;
+    }
+
+    /* Only padding is trimmed here. The poster and its track are deliberately left alone: a phone
+       gives the row the full column width, so there is more room for the title here than on any
+       desktop column, not less. */
+    .schedule-episode {
+        @apply gap-2 p-1.5;
+    }
+
+    .schedule-episode__title {
+        @apply text-[0.82rem];
+    }
+
+    .calendar-tabs__link,
+    .season-picker__option {
+        @apply px-3 py-1.5 text-[0.78rem];
+    }
 }
 
 /* The stylesheet had no reduced-motion handling at all. This covers the new components and
@@ -3490,6 +3847,17 @@
     .boot-loading__spark,
     .boot-loading__dots span {
         animation: none;
+    }
+
+    /* Border-colour fades on hover, and the dim/un-dim crossfade. Nothing in the calendar uses
+       transform or translate today, but if a hover lift is ever added to .schedule-episode it has
+       to be neutralised as `translate`, not `transform` - see the .button:hover note above. The
+       skeleton rows need no rule here: they reuse .skeleton, so the shimmer is already handled. */
+    .schedule-episode,
+    .schedule-episode--dimmed,
+    .calendar-tabs__link,
+    .season-picker__option {
+        transition: none;
     }
 }
 

@@ -1,0 +1,32 @@
+@* The seasons of one year plus the whole year, as links rather than as a control. The season lives
+   in the route, so these are genuinely addresses - middle-clickable, bookmarkable, and Back walks
+   through them. *@
+<nav class="season-picker" aria-label="Season">
+    @* PickerOptions rather than Seasons: the fifth entry is the whole year, which is not a
+       MediaSeason and never reaches AniList as one. *@
+    @foreach (var season in AnimeSeasonCalendar.PickerOptions)
+    {
+        @* Default prefix matching is safe here, unlike NavMenu's /admin: the hrefs are siblings at the
+           same depth, so none can claim another's active state.
+
+           Selection is styled off NavLink's own .active rather than a --selected modifier like
+           .status-picker__option uses. That is a deliberate divergence: these are routes, not local
+           state, so NavLink already owns the answer. *@
+        <NavLink href="@($"calendar/archive/{Year}/{AnimeSeasonCalendar.ToRouteSlug(season)}")"
+                 class="season-picker__option">
+            @Label(season)
+        </NavLink>
+    }
+</nav>
+
+@code {
+    /// <summary>The year these links point at.</summary>
+    [Parameter, EditorRequired]
+    public required int Year { get; set; }
+
+    // MediaDisplayFormatter only knows real MediaSeason values, and teaching it the whole-year
+    // sentinel would push a purely archive-side concept into a formatter shared by every page.
+    private static string Label(string season) => AnimeSeasonCalendar.IsWholeYear(season)
+        ? "Whole year"
+        : MediaDisplayFormatter.SeasonLabel(season);
+}

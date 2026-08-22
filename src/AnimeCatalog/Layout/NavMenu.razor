@@ -14,6 +14,9 @@
         <nav class="site-nav">
             <NavLink href="" Match="NavLinkMatch.All" class="site-nav__link">Home</NavLink>
             <NavLink href="catalog" class="site-nav__link">Catalog</NavLink>
+            @* No Match here, unlike the admin link below: prefix matching is WANTED so the
+               archive routes keep this lit. /calendar has no sibling that could double-activate. *@
+            <NavLink href="calendar" class="site-nav__link">Calendar</NavLink>
             @if (AuthService.IsAdmin)
             {
                 <NavLink href="watch-next" class="site-nav__link">Watch next</NavLink>
@@ -170,6 +173,7 @@
                 <nav class="nav-drawer__nav">
                     <NavLink href="" Match="NavLinkMatch.All" class="nav-drawer__link">Home</NavLink>
                     <NavLink href="catalog" class="nav-drawer__link">Catalog</NavLink>
+                    <NavLink href="calendar" class="nav-drawer__link">Calendar</NavLink>
                     @if (AuthService.IsAdmin)
                     {
                         <NavLink href="watch-next" class="nav-drawer__link">Watch next</NavLink>
