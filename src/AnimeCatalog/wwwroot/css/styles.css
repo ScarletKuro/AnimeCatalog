@@ -1336,10 +1336,13 @@
     }
 
     /* One square for every control in the strip, arrows and numbers alike, so the row reads as a
-       single object rather than as icons parked beside a list. */
+       single object rather than as icons parked beside a list. The calendars' steppers join the same
+       rule so a paged view looks the same wherever it is. */
     .catalog-pager__step,
     .catalog-pager__page,
-    .catalog-pager__gap {
+    .catalog-pager__gap,
+    .period-stepper__step,
+    .period-stepper__action {
         @apply grid h-9 min-w-9 shrink-0 cursor-pointer place-items-center rounded-full border px-2 text-sm font-semibold;
         border-color: rgba(255, 255, 255, 0.08);
         background: rgba(255, 255, 255, 0.04);
@@ -1350,6 +1353,8 @@
     }
 
     .catalog-pager__step:hover:not(:disabled),
+    .period-stepper__step:hover:not(:disabled),
+    .period-stepper__action:hover:not(:disabled),
     .catalog-pager__page:hover {
         color: var(--text-strong);
         border-color: rgba(158, 240, 255, 0.24);
@@ -1357,7 +1362,9 @@
     }
 
     /* Matches .button:disabled rather than inventing a second disabled look. */
-    .catalog-pager__step:disabled {
+    .catalog-pager__step:disabled,
+    .period-stepper__step:disabled,
+    .period-stepper__action:disabled {
         @apply cursor-default opacity-65;
     }
 
@@ -1379,13 +1386,42 @@
         @apply cursor-default border-transparent bg-transparent;
     }
 
-    .catalog-pager__step svg {
+    .catalog-pager__step svg,
+    .period-stepper__step svg {
         @apply h-4 w-4;
         fill: none;
         stroke: currentColor;
         stroke-linecap: round;
         stroke-linejoin: round;
         stroke-width: 1.8;
+    }
+
+    /* Arrow, value, arrow. The gap is small on purpose: the three are one control, and a wide gap
+       reads as three. */
+    .period-stepper {
+        @apply flex shrink-0 items-center gap-1.5;
+    }
+
+    /* min-w is what stops the row twitching as the label's width changes - "1-7 June 2026" is
+       narrower than "28 September-4 October 2026", and the arrows must not move under a thumb
+       between one week and the next. tabular-nums does the same job for the digits. */
+    .period-stepper__value {
+        @apply m-0 min-w-40 text-center text-sm font-semibold;
+        color: var(--text-strong);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* The stepper plus whatever else the panel puts beside it. Wraps as a unit rather than letting
+       the stepper come apart. */
+    .panel__actions {
+        @apply flex flex-wrap items-center justify-end gap-2;
+    }
+
+    /* A word rather than a glyph, so it needs the breathing room a 36px square does not. Everything
+       else about it - height, border, hover, disabled - comes from the shared rule above, which is
+       the point: it sits in a row of icon buttons and must not be the only one that lifts on hover. */
+    .period-stepper__action {
+        @apply px-4;
     }
 
     .franchise-card,
@@ -3648,6 +3684,28 @@
     .panel__header,
     .details-hero > img {
         @apply max-w-full;
+    }
+
+    /* Stacked, because justify-between across a heading and a control row has nothing left to
+       distribute at this width: the controls wrapped and still crowded the heading. A header whose
+       only child is its heading is unaffected. */
+    .panel__header {
+        @apply flex-col items-start;
+    }
+
+    /* Full width once stacked, so the stepper can spread instead of huddling in a corner. */
+    .panel__actions {
+        @apply w-full justify-between;
+    }
+
+    /* Free to grow now that it owns the row - it is the widest thing in the stepper and the first to
+       be squeezed on a 320px viewport. */
+    .period-stepper {
+        @apply grow;
+    }
+
+    .period-stepper__value {
+        @apply grow;
     }
 
     .editor-grid {

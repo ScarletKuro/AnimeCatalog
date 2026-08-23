@@ -247,6 +247,8 @@ public sealed class AiringCalendarTests
         });
     }
 
+    // Both controls are icons, so the name each exposes is the only thing a test - or a screen reader
+    // - has to go on. Asserted by that name rather than by position for the same reason.
     [Fact]
     public void WhileLoadingItOffersCancel_AndReloadOnceSettled()
     {
@@ -254,11 +256,10 @@ public sealed class AiringCalendarTests
 
         var cut = context.Render<AiringCalendar>();
 
-        Assert.Contains("Cancel", cut.Markup);
+        cut.Find("[aria-label='Stop loading']").Click();
 
-        cut.Find("button.button--ghost:last-child").Click();
-
-        cut.WaitForAssertion(() => Assert.Contains("Reload", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("[aria-label='Reload the schedule']")));
+        Assert.Empty(cut.FindAll("[aria-label='Stop loading']"));
     }
 
     [Fact]
@@ -268,11 +269,26 @@ public sealed class AiringCalendarTests
 
         var cut = context.Render<AiringCalendar>();
 
-        cut.WaitForAssertion(() => Assert.Contains("17-23 August 2026", cut.Find(".schedule-toolbar__range").TextContent));
+        cut.WaitForAssertion(() => Assert.Equal("17-23 August 2026", cut.Find(".period-stepper__value").TextContent));
 
-        cut.FindAll("button.button--ghost")[0].Click();
+        cut.Find("[aria-label='Previous week']").Click();
+        cut.WaitForAssertion(() => Assert.Equal("10-16 August 2026", cut.Find(".period-stepper__value").TextContent));
 
-        cut.WaitForAssertion(() => Assert.Contains("10-16 August 2026", cut.Find(".schedule-toolbar__range").TextContent));
+        cut.Find("[aria-label='Next week']").Click();
+        cut.WaitForAssertion(() => Assert.Equal("17-23 August 2026", cut.Find(".period-stepper__value").TextContent));
+    }
+
+    // The range is the value of the stepper, so it has to sit inside it: as a separate line under the
+    // heading it was a second row that crowded the controls off the edge of a phone.
+    [Fact]
+    public void TheWeekRangeSitsInsideTheStepper()
+    {
+        using var context = Create(new StubBrowseService { Load = AiringScheduleLoad.Empty });
+
+        var cut = context.Render<AiringCalendar>();
+
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".period-stepper .period-stepper__value")));
+        Assert.Empty(cut.FindAll(".schedule-toolbar__range"));
     }
 
     // Signing in changes the overlay, not the week. Re-spending five to seven AniList requests on a

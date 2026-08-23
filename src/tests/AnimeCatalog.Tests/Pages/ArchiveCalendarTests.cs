@@ -293,7 +293,7 @@ public sealed class ArchiveCalendarTests
 
         cut.WaitForAssertion(() =>
         {
-            var back = cut.FindAll(".panel__header button")[0];
+            var back = cut.Find("[aria-label='Previous year']");
             Assert.True(back.HasAttribute("disabled"));
         });
     }
@@ -515,7 +515,7 @@ public sealed class ArchiveCalendarTests
 
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".archive-band")));
 
-        cut.FindAll(".panel__header button")[0].Click();
+        cut.Find("[aria-label='Previous year']").Click();
 
         cut.WaitForAssertion(() => Assert.EndsWith("calendar/archive/2010/all", navigation.Uri));
     }

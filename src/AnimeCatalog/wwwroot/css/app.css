@@ -1782,7 +1782,7 @@
     gap: calc(var(--spacing) * 1.5);
     padding: 0px;
   }
-  .catalog-pager__step, .catalog-pager__page, .catalog-pager__gap {
+  .catalog-pager__step, .catalog-pager__page, .catalog-pager__gap, .period-stepper__step, .period-stepper__action {
     display: grid;
     height: calc(var(--spacing) * 9);
     min-width: calc(var(--spacing) * 9);
@@ -1803,12 +1803,12 @@
     transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
     font-variant-numeric: tabular-nums;
   }
-  .catalog-pager__step:hover:not(:disabled), .catalog-pager__page:hover {
+  .catalog-pager__step:hover:not(:disabled), .period-stepper__step:hover:not(:disabled), .period-stepper__action:hover:not(:disabled), .catalog-pager__page:hover {
     color: var(--text-strong);
     border-color: rgba(158, 240, 255, 0.24);
     background: rgba(158, 240, 255, 0.1);
   }
-  .catalog-pager__step:disabled {
+  .catalog-pager__step:disabled, .period-stepper__step:disabled, .period-stepper__action:disabled {
     cursor: default;
     opacity: 65%;
   }
@@ -1827,7 +1827,7 @@
     border-color: transparent;
     background-color: transparent;
   }
-  .catalog-pager__step svg {
+  .catalog-pager__step svg, .period-stepper__step svg {
     height: calc(var(--spacing) * 4);
     width: calc(var(--spacing) * 4);
     fill: none;
@@ -1835,6 +1835,33 @@
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-width: 1.8;
+  }
+  .period-stepper {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .period-stepper__value {
+    margin: 0px;
+    min-width: calc(var(--spacing) * 40);
+    text-align: center;
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+  }
+  .panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: calc(var(--spacing) * 2);
+  }
+  .period-stepper__action {
+    padding-inline: calc(var(--spacing) * 4);
   }
   .franchise-card, .poster-card {
     position: relative;
@@ -4202,6 +4229,20 @@
   }
   .details-hero, .page-header, .panel__header, .details-hero > img {
     max-width: 100%;
+  }
+  .panel__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .panel__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .period-stepper {
+    flex-grow: 1;
+  }
+  .period-stepper__value {
+    flex-grow: 1;
   }
   .editor-grid {
     grid-template-columns: repeat(1, minmax(0, 1fr));

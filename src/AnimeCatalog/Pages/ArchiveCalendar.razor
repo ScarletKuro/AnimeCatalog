@@ -31,19 +31,35 @@
                 <p class="schedule-toolbar__status" role="status" aria-live="polite">@StatusText</p>
             </div>
 
-            <div class="button-row">
-                @* Labelled with the target year, so the buttons describe themselves and need no
-                   icons - consistent with the text-only nav. *@
-                <button type="button" class="button button--ghost" disabled="@(_year <= AnimeSeasonCalendar.MinimumYear)" @onclick="() => GoToYear(_year - 1)">‹ @(_year - 1)</button>
-                <button type="button" class="button button--ghost" disabled="@(_year >= MaximumYear)" @onclick="() => GoToYear(_year + 1)">@(_year + 1) ›</button>
+            @* The year in the middle rather than on the buttons. The old pair labelled themselves
+               with their target - "‹ 2025", "2027 ›" - which needed no aria-label but cost two full
+               pills and left the year the page is actually showing to the heading alone. *@
+            <div class="panel__actions">
+                <PeriodStepper Value="@_year.ToString(CultureInfo.InvariantCulture)"
+                               PreviousLabel="Previous year"
+                               NextLabel="Next year"
+                               PreviousDisabled="@(_year <= AnimeSeasonCalendar.MinimumYear)"
+                               NextDisabled="@(_year >= MaximumYear)"
+                               OnPrevious="() => GoToYear(_year - 1)"
+                               OnNext="() => GoToYear(_year + 1)" />
 
                 @if (_isLoading)
                 {
-                    <button type="button" class="button button--ghost" @onclick="CancelLoad">Cancel</button>
+                    <button type="button" class="period-stepper__step" aria-label="Stop loading" @onclick="CancelLoad">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M6.5 6.5 13.5 13.5" />
+                            <path d="M13.5 6.5 6.5 13.5" />
+                        </svg>
+                    </button>
                 }
                 else
                 {
-                    <button type="button" class="button button--ghost" @onclick="ReloadAsync">Reload</button>
+                    <button type="button" class="period-stepper__step" aria-label="Reload the season" @onclick="ReloadAsync">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M10 4.75A5.25 5.25 0 1 1 4.75 10" />
+                            <path d="M3 11.75 4.75 10 6.5 11.75" />
+                        </svg>
+                    </button>
                 }
             </div>
         </div>

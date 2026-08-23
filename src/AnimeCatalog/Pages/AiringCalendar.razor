@@ -24,23 +24,40 @@
 
     <section class="panel">
         <div class="panel__header">
-            <div>
-                <h2>Airing schedule</h2>
-                <p class="schedule-toolbar__range">@AiringTimeFormatter.WeekRangeLabel(_week.StartDate)</p>
-            </div>
+            <h2>Airing schedule</h2>
 
-            <div class="button-row">
-                <button type="button" class="button button--ghost" @onclick="GoToPreviousWeekAsync">‹ Previous</button>
-                <button type="button" class="button button--ghost" disabled="@IsCurrentWeek" @onclick="GoToCurrentWeekAsync">This week</button>
-                <button type="button" class="button button--ghost" @onclick="GoToNextWeekAsync">Next ›</button>
+            @* The week range moved into the stepper, so it is no longer a second line under the
+               heading. "This week" stays a word rather than becoming an icon - nothing draws "jump
+               back to now" unambiguously - and stays present-but-disabled rather than disappearing on
+               the current week, so the row does not change width underneath a thumb. *@
+            <div class="panel__actions">
+                <PeriodStepper Value="@AiringTimeFormatter.WeekRangeLabel(_week.StartDate)"
+                               PreviousLabel="Previous week"
+                               NextLabel="Next week"
+                               OnPrevious="GoToPreviousWeekAsync"
+                               OnNext="GoToNextWeekAsync" />
+
+                <button type="button" class="period-stepper__action" disabled="@IsCurrentWeek" @onclick="GoToCurrentWeekAsync">This week</button>
 
                 @if (_isLoading)
                 {
-                    <button type="button" class="button button--ghost" @onclick="CancelLoad">Cancel</button>
+                    <button type="button" class="period-stepper__step" aria-label="Stop loading" @onclick="CancelLoad">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M6.5 6.5 13.5 13.5" />
+                            <path d="M13.5 6.5 6.5 13.5" />
+                        </svg>
+                    </button>
                 }
                 else
                 {
-                    <button type="button" class="button button--ghost" @onclick="ReloadAsync">Reload</button>
+                    @* Same footprint as the cancel it replaces, so the row does not jump when a load
+                       starts or finishes. *@
+                    <button type="button" class="period-stepper__step" aria-label="Reload the schedule" @onclick="ReloadAsync">
+                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                            <path d="M10 4.75A5.25 5.25 0 1 1 4.75 10" />
+                            <path d="M3 11.75 4.75 10 6.5 11.75" />
+                        </svg>
+                    </button>
                 }
             </div>
         </div>
