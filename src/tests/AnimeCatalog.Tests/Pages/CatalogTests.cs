@@ -182,50 +182,103 @@ public sealed class CatalogTests
         Assert.Equal(TitleFor(97), cut.FindAll(".franchise-card__title")[0].TextContent);
     }
 
+    // The pinned numbers are the jump-to-the-end controls now, which is why there are no separate
+    // first and last steps: two glyph buttons that said nothing paid for two numbers that do.
     [Fact]
-    public async Task TheLastPageIsOneClickAwayFromTheFirst()
+    public async Task ThePinnedNumbersReachEitherEndInOneClick()
     {
         await using var context = CreateSeededContext(1000, out _);
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = RenderCatalog(context);
-        cut.Find(".catalog-pager [aria-label='Last page']").Click();
+        cut.Find("[aria-label='Page 21']").Click();
 
         Assert.EndsWith("catalog?page=21", navigation.Uri);
 
-        cut.Find(".catalog-pager [aria-label='First page']").Click();
+        cut.Find("[aria-label='Page 1']").Click();
 
         Assert.EndsWith("catalog", navigation.Uri);
     }
 
-    // Both ends stay listed however deep in the catalog the visitor is, so the strip is a map of the
-    // whole list rather than a window onto part of it.
-    [Fact]
-    public async Task ALongCatalogElidesTheMiddleButKeepsBothEnds()
+    // The first and last are pinned, and the three between them slide. Approaching either end the
+    // window shifts inward rather than overlapping a pinned number, so no page is ever listed twice.
+    [Theory]
+    [InlineData(1, "1", "2", "3", "4", "21")]
+    [InlineData(2, "1", "2", "3", "4", "21")]
+    [InlineData(3, "1", "2", "3", "4", "21")]
+    [InlineData(11, "1", "10", "11", "12", "21")]
+    [InlineData(19, "1", "18", "19", "20", "21")]
+    [InlineData(21, "1", "18", "19", "20", "21")]
+    public async Task TheWindowSlidesBetweenThePinnedEnds(int page, params string[] expected)
     {
         await using var context = CreateSeededContext(1000, out _);
 
-        var cut = RenderCatalog(context, "catalog?page=11");
+        var cut = RenderCatalog(context, $"catalog?page={page}");
 
-        Assert.Equal(
-            ["1", "9", "10", "11", "12", "13", "21"],
-            cut.FindAll(".catalog-pager__page").Select(page => page.TextContent));
-        Assert.Equal(2, cut.FindAll(".catalog-pager__gap").Count);
+        Assert.Equal(expected, cut.FindAll(".catalog-pager__page").Select(number => number.TextContent));
     }
 
-    // A single hidden number is filled in rather than elided: the ellipsis would be wider than the
-    // page it hides and would cost a click to resolve.
-    [Fact]
-    public async Task ASingleSkippedPageIsShownInsteadOfAnEllipsis()
+    // The last number is the only thing on the row that says how many pages there are, and the row is
+    // where the question gets asked - the count line above the grid is forty-eight cards away.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(11)]
+    [InlineData(21)]
+    public async Task TheLastPageIsAlwaysOnTheStrip(int page)
     {
         await using var context = CreateSeededContext(1000, out _);
 
-        var cut = RenderCatalog(context, "catalog?page=4");
+        var cut = RenderCatalog(context, $"catalog?page={page}");
 
-        Assert.Equal(
-            ["1", "2", "3", "4", "5", "6", "21"],
-            cut.FindAll(".catalog-pager__page").Select(page => page.TextContent));
-        Assert.Single(cut.FindAll(".catalog-pager__gap"));
+        Assert.Contains("21", cut.FindAll(".catalog-pager__page").Select(number => number.TextContent));
+    }
+
+    // The requirement behind the whole shape: a strip whose size changes with the page is a strip
+    // that wraps onto two rows on a phone. Asserted as counts rather than as pixels, because the
+    // counts are what the width follows from - five 36px numbers, two 36px arrows and at most two
+    // 16px separators is 332px, which is one row on any phone.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(11)]
+    [InlineData(21)]
+    public async Task TheStripIsBoundedWhereverYouAre(int page)
+    {
+        await using var context = CreateSeededContext(1000, out _);
+
+        var cut = RenderCatalog(context, $"catalog?page={page}");
+
+        Assert.Equal(5, cut.FindAll(".catalog-pager__page").Count);
+        // Five numbers plus previous and next. No first/last steps: the pinned numbers are those.
+        Assert.Equal(7, cut.FindAll(".catalog-pager button").Count);
+        Assert.InRange(cut.FindAll(".catalog-pager__gap").Count, 0, 2);
+    }
+
+    // A separator appears exactly where the numbers stop being consecutive, and nowhere else - that
+    // is the whole job, since "1 2 3 4 21" otherwise reads as five adjacent pages.
+    [Theory]
+    [InlineData(1000, 11, 2)]   // 1 … 10 11 12 … 21
+    [InlineData(1000, 2, 1)]    // 1 2 3 4 … 21
+    [InlineData(1000, 21, 1)]   // 1 … 18 19 20 21
+    [InlineData(130, 1, 0)]     // 1 2 3 - nothing skipped, nothing marked
+    public async Task ASeparatorMarksEveryJumpAndOnlyAJump(int entries, int page, int separators)
+    {
+        await using var context = CreateSeededContext(entries, out _);
+
+        var cut = RenderCatalog(context, $"catalog?page={page}");
+
+        Assert.Equal(separators, cut.FindAll(".catalog-pager__gap").Count);
+    }
+
+    // The window shrinks to the page count rather than padding itself out with a page that is not
+    // there.
+    [Fact]
+    public async Task ACatalogOfTwoPagesShowsBothWithoutPadding()
+    {
+        await using var context = CreateSeededContext(60, out _);
+
+        var cut = RenderCatalog(context);
+
+        Assert.Equal(["1", "2"], cut.FindAll(".catalog-pager__page").Select(number => number.TextContent));
     }
 
     [Fact]
@@ -235,10 +288,8 @@ public sealed class CatalogTests
 
         var cut = RenderCatalog(context);
 
-        Assert.True(cut.Find(".catalog-pager [aria-label='First page']").HasAttribute("disabled"));
         Assert.True(cut.Find(".catalog-pager [aria-label='Previous page']").HasAttribute("disabled"));
         Assert.False(cut.Find(".catalog-pager [aria-label='Next page']").HasAttribute("disabled"));
-        Assert.False(cut.Find(".catalog-pager [aria-label='Last page']").HasAttribute("disabled"));
     }
 
     // Reachable by narrowing the filters while deep in the list, or by editing the address. The
@@ -344,6 +395,8 @@ public sealed class CatalogTests
         Assert.Equal("10 results.", cut.Find(".catalog-toolbar__status").TextContent);
     }
 
+    // No page position on this line: the pager pins the last number, so repeating it here would say
+    // the same thing two screens further from where anybody asks.
     [Fact]
     public async Task TheStatusLineNamesTheVisibleRangeAndTheTotal()
     {

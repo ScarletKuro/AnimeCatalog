@@ -1782,7 +1782,7 @@
     gap: calc(var(--spacing) * 1.5);
     padding: 0px;
   }
-  .catalog-pager__step, .catalog-pager__page, .catalog-pager__gap, .icon-button {
+  .catalog-pager__step, .catalog-pager__page, .icon-button {
     display: grid;
     height: calc(var(--spacing) * 9);
     min-width: calc(var(--spacing) * 9);
@@ -1823,9 +1823,16 @@
     background: linear-gradient(135deg, #9ef0ff, #f5e598);
   }
   .catalog-pager__gap {
+    display: grid;
+    width: calc(var(--spacing) * 4);
+    flex-shrink: 0;
     cursor: default;
-    border-color: transparent;
-    background-color: transparent;
+    place-items: center;
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-soft);
   }
   .catalog-pager__step svg, .icon-button svg {
     height: calc(var(--spacing) * 4);

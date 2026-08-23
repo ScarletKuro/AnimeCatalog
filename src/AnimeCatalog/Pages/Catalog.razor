@@ -108,46 +108,41 @@
             @if (PageCount > 1)
             {
                 @* A navigation landmark, because it is a list of destinations rather than a widget,
-                   and the numbers carry the position that a "page 2 of 3" caption used to spell out.
+                   and the numbers carry both the position and the total that a "page 2 of 3" caption
+                   used to spell out.
 
-                   The four steps are icon-only, so each one states its own name: this is the one
-                   place the house preference for a self-describing label cannot apply, an arrow
-                   having no text to read. aria-current marks the page being viewed, which is what
-                   lets a screen reader announce the list without the styling. *@
+                   Two steps rather than four: the pinned first and last numbers are the jump-to-the-
+                   end controls, and a number says which end it is where a glyph did not. They are
+                   icon-only, so each states its own name - the one place the house preference for a
+                   self-describing label cannot apply, an arrow having no text to read. aria-current
+                   marks the page being viewed, which lets a screen reader announce the list without
+                   reference to the styling. *@
                 <nav class="catalog-pager" aria-label="Catalog pages">
-                    @* Bar and chevron are pushed to opposite edges of the box, 5.75 units apart. Any
-                       tighter and the two strokes close up into the letter K rather than reading as
-                       "jump to the end" - which is what a snug 1.75 did. The chevron keeps the same
-                       4.75 width as the single ones either side of it, so all four match. *@
-                    <button type="button" class="catalog-pager__step" aria-label="First page" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(1)">
-                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
-                            <path d="M15.25 5.25 10.5 10 15.25 14.75" />
-                            <path d="M4.75 5.25v9.5" />
-                        </svg>
-                    </button>
                     <button type="button" class="catalog-pager__step" aria-label="Previous page" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(CurrentPage - 1)">
                         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
                             <path d="M12.25 5.25 7.5 10l4.75 4.75" />
                         </svg>
                     </button>
 
+                    @* "number", not "page": @page is a Razor directive, so rendering a variable of
+                       that name is a compile error rather than the value. *@
                     <ol class="catalog-pager__pages">
                         @foreach (var slot in PageSlots)
                         {
                             <li>
-                                @if (slot is null)
+                                @if (slot is not { } number)
                                 {
-                                    @* Inert and unannounced: it stands for pages that are reachable
-                                       through the numbers around it, not for one of its own. *@
+                                    @* Inert and unannounced: it stands for pages the numbers either
+                                       side of it reach, not for one of its own. *@
                                     <span class="catalog-pager__gap" aria-hidden="true">…</span>
                                 }
                                 else
                                 {
                                     <button type="button"
-                                            class="@(slot == CurrentPage ? "catalog-pager__page catalog-pager__page--current" : "catalog-pager__page")"
-                                            aria-label="@($"Page {slot}")"
-                                            aria-current="@(slot == CurrentPage ? "page" : null)"
-                                            @onclick="() => GoToPage(slot.Value)">@slot</button>
+                                            class="@(number == CurrentPage ? "catalog-pager__page catalog-pager__page--current" : "catalog-pager__page")"
+                                            aria-label="@($"Page {number}")"
+                                            aria-current="@(number == CurrentPage ? "page" : null)"
+                                            @onclick="() => GoToPage(number)">@number</button>
                                 }
                             </li>
                         }
@@ -156,12 +151,6 @@
                     <button type="button" class="catalog-pager__step" aria-label="Next page" disabled="@(CurrentPage >= PageCount)" @onclick="() => GoToPage(CurrentPage + 1)">
                         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
                             <path d="M7.75 5.25 12.5 10l-4.75 4.75" />
-                        </svg>
-                    </button>
-                    <button type="button" class="catalog-pager__step" aria-label="Last page" disabled="@(CurrentPage >= PageCount)" @onclick="() => GoToPage(PageCount)">
-                        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
-                            <path d="M4.75 5.25 9.5 10 4.75 14.75" />
-                            <path d="M15.25 5.25v9.5" />
                         </svg>
                     </button>
                 </nav>
@@ -178,10 +167,15 @@
     private const int PageSize = 48;
 
     /// <summary>
-    /// Numbers shown either side of the current page. Two keeps the strip to nine slots at its
-    /// widest, which fits a phone without wrapping.
+    /// How many page numbers slide between the pinned first and last, at any page count.
     /// </summary>
-    private const int PageWindowRadius = 2;
+    /// <remarks>
+    /// Fixed rather than derived from the current page, because a constant control count is the only
+    /// thing that makes the row a constant width - and a variable one wrapped onto two lines on a
+    /// phone. Three here means five numbers plus the two chevrons: seven 36px controls and six 6px
+    /// gaps, so 288px, which clears a 320px viewport. Raising it puts the wrap back.
+    /// </remarks>
+    private const int PageWindowSize = 3;
 
     // Bound as strings, every one of them, including the page. A typed [SupplyParameterFromQuery]
     // throws on a value it cannot parse, and it throws from inside SetParametersAsync where the only
@@ -238,47 +232,74 @@
 
     // "results" rather than "franchises", because a standalone anime gets a card without being one,
     // and rather than "entries", because a card holds several and its own toggle already counts them.
+    //
+    // No "Page 2 of 3" here. It belongs on this line only while the pager cannot show the last page
+    // itself, and the pager pins it - so saying it here would be a second telling of what the strip
+    // already shows, two screens further from where anyone asks the question.
     private string RangeLabel => PageCount == 1
         ? $"{_items.Count} result{(_items.Count == 1 ? string.Empty : "s")}."
         : $"Showing {FirstIndex + 1}-{Math.Min(FirstIndex + PageSize, _items.Count)} of {_items.Count} results.";
 
     /// <summary>
-    /// The page numbers to render, with <c>null</c> standing for a run of pages left out. The first
-    /// and last are always present, so the two ends of the catalog stay one click away however deep
-    /// into it the visitor is.
+    /// The first page, the last page, and a sliding window of <see cref="PageWindowSize"/> between
+    /// them - so five numbers on any catalog of five pages or more.
     /// </summary>
     /// <remarks>
-    /// A gap of exactly one page is filled in rather than elided: an ellipsis hiding a single number
-    /// is wider than the number and costs a click to resolve.
+    /// The ends are pinned because the last number is the only thing on the row that says how many
+    /// pages there are, and the row is where somebody asks. It used to be spelled out on the count
+    /// line above the grid instead, which is forty-eight cards away by the time you reach the pager -
+    /// far enough that you would neither remember it nor notice it.
+    /// <para>
+    /// The window covers 2..PageCount-1 rather than the whole range, so it can never render a number
+    /// the pinned ends already show. That is what keeps the count fixed at five: pinning the ends
+    /// *into* a window that also spanned them is what made the count vary with the page, and a
+    /// variable count is what wrapped the row onto two lines on a phone.
+    /// </para>
     /// </remarks>
-    private IEnumerable<int?> PageSlots
+    private IEnumerable<int> PageNumbers
     {
         get
         {
             var pages = new SortedSet<int> { 1, PageCount };
+            var interior = Math.Min(PageWindowSize, Math.Max(0, PageCount - 2));
 
-            for (var page = CurrentPage - PageWindowRadius; page <= CurrentPage + PageWindowRadius; page++)
+            if (interior > 0)
             {
-                if (page >= 1 && page <= PageCount)
+                // Clamped into the interior at both ends, so approaching either edge slides the
+                // window inward rather than running it off into the pinned numbers.
+                var start = Math.Clamp(CurrentPage - ((interior - 1) / 2), 2, PageCount - interior);
+
+                for (var page = start; page < start + interior; page++)
                 {
                     pages.Add(page);
                 }
             }
 
+            return pages;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="PageNumbers"/> with a <c>null</c> wherever consecutive entries are not consecutive
+    /// pages - the ellipsis, in other words.
+    /// </summary>
+    /// <remarks>
+    /// Without it "1 2 3 4 21" reads as a list of five adjacent pages and nothing says the step from
+    /// 4 to 21 is a jump. The separator was dropped when this row was fighting to fit a phone, which
+    /// was the wrong economy: nine 36px numbers were what overflowed, and two 16px marks are what
+    /// makes the five that replaced them legible. Worst case is 332px, still one row on any phone.
+    /// </remarks>
+    private IEnumerable<int?> PageSlots
+    {
+        get
+        {
             var previous = 0;
 
-            foreach (var page in pages)
+            foreach (var page in PageNumbers)
             {
-                if (previous > 0)
+                if (previous > 0 && page - previous > 1)
                 {
-                    if (page - previous == 2)
-                    {
-                        yield return previous + 1;
-                    }
-                    else if (page - previous > 2)
-                    {
-                        yield return null;
-                    }
+                    yield return null;
                 }
 
                 yield return page;

@@ -1340,7 +1340,6 @@
        rule so a paged view looks the same wherever it is. */
     .catalog-pager__step,
     .catalog-pager__page,
-    .catalog-pager__gap,
     .icon-button {
         @apply grid h-9 min-w-9 shrink-0 cursor-pointer place-items-center rounded-full border px-2 text-sm font-semibold;
         border-color: rgba(255, 255, 255, 0.08);
@@ -1378,9 +1377,13 @@
         background: linear-gradient(135deg, #9ef0ff, #f5e598);
     }
 
-    /* Neither a control nor a destination: no border, no hover, nothing to aim at. */
+    /* Deliberately outside the 36px group above: this is a mark, not a control, and at a control's
+       width two of them would cost more than the numbers they stand in for. 16px is what fits once
+       five numbers and two arrows have taken theirs, and it is why "1 2 3 4 21" now reads as the
+       jump it is. No border, no hover, nothing to aim at. */
     .catalog-pager__gap {
-        @apply cursor-default border-transparent bg-transparent;
+        @apply grid w-4 shrink-0 cursor-default place-items-center text-sm font-semibold;
+        color: var(--text-soft);
     }
 
     .catalog-pager__step svg,
