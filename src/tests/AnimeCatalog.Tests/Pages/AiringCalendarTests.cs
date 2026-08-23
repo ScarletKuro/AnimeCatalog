@@ -233,7 +233,7 @@ public sealed class AiringCalendarTests
 
         var browse = new StubBrowseService
         {
-            Load = LoadOf(Schedule(1, new DateTimeOffset(2026, 8, 18, 9, 0, 0, TimeSpan.Zero), episode: 5))
+            Load = LoadOf(Schedule(1, new DateTimeOffset(2026, 8, 18, 9, 0, 0, TimeSpan.Zero), episode: 5, nextAiringEpisode: 5))
         };
 
         using var context = Create(browse, overlay);
@@ -393,7 +393,7 @@ public sealed class AiringCalendarTests
         CompleteThrough = schedules.Length == 0 ? null : schedules[^1].AiringAtUtc
     };
 
-    private static AniListAiringSchedule Schedule(int id, DateTimeOffset airsAt, int episode = 1) => new()
+    private static AniListAiringSchedule Schedule(int id, DateTimeOffset airsAt, int episode = 1, int? nextAiringEpisode = null) => new()
     {
         Id = id,
         MediaId = id,
@@ -405,7 +405,11 @@ public sealed class AiringCalendarTests
             Title = new AniListTitle { Romaji = $"Title {id}" },
             Format = "TV",
             CountryOfOrigin = "JP",
-            SiteUrl = $"https://anilist.co/anime/{id}"
+            SiteUrl = $"https://anilist.co/anime/{id}",
+            // Drives the behind label - see CalendarService.AiredEpisodeCount.
+            NextAiringEpisode = nextAiringEpisode is null
+                ? null
+                : new AniListNextAiringEpisode { Episode = nextAiringEpisode.Value }
         }
     };
 

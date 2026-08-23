@@ -18,6 +18,13 @@ public sealed record ScheduleEpisodeViewModel
 
     public int? TotalEpisodes { get; init; }
 
+    /// <summary>
+    /// Episodes of this series broadcast so far, from AniList's own nextAiringEpisode rather than
+    /// from <see cref="Episode"/>. Null when AniList says neither how many have aired nor how many
+    /// there are, in which case the catalog note is left off rather than guessed at.
+    /// </summary>
+    public int? EpisodesAired { get; init; }
+
     public string? Format { get; init; }
 
     public int? Duration { get; init; }
@@ -46,14 +53,22 @@ public sealed record ScheduleEpisodeViewModel
             ? $"{format} · {duration}"
             : MediaDisplayFormatter.FormatLabel(Format);
 
-    /// <summary>"3 episodes behind" or "Caught up", and only for a title the owner is watching.</summary>
-    public string? CatalogNote => Catalog is null || Episode is null
+    /// <summary>
+    /// "3 episodes behind" or "Caught up", for any title in the catalog whatever its status - a
+    /// planned or dropped series still gets one, which is how the progress on it stays visible.
+    /// </summary>
+    /// <remarks>
+    /// Keyed on <see cref="EpisodesAired"/>, not on <see cref="Episode"/>: the same series must read
+    /// the same on every week of the calendar, because how far behind you are does not depend on
+    /// which week you happen to be looking at.
+    /// </remarks>
+    public string? CatalogNote => Catalog is null || EpisodesAired is null
         ? null
-        : AiringTimeFormatter.BehindLabel(Episode.Value, Catalog.EpisodesWatched);
+        : AiringTimeFormatter.BehindLabel(EpisodesAired.Value, Catalog.EpisodesWatched);
 
     public bool IsBehind => Catalog is not null
-        && Episode is not null
-        && AiringTimeFormatter.IsBehind(Episode.Value, Catalog.EpisodesWatched);
+        && EpisodesAired is not null
+        && AiringTimeFormatter.IsBehind(EpisodesAired.Value, Catalog.EpisodesWatched);
 
     public CatalogStatus? CatalogStatus => Catalog?.Status;
 }

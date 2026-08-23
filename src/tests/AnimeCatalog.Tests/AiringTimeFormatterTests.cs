@@ -63,26 +63,28 @@ public sealed class AiringTimeFormatterTests
         }
     }
 
-    // The episode airing now has not been watchable yet, so it is not counted against the owner.
+    // Counts what has been broadcast against what has been watched, and nothing else. Watching more
+    // than has aired - a rewatch, or a count nudged ahead - still reads as caught up rather than
+    // going negative.
     [Theory]
-    [InlineData(5, 4, "Caught up")]
-    [InlineData(5, 5, "Caught up")]
-    [InlineData(5, 9, "Caught up")]
-    [InlineData(5, 3, "1 episode behind")]
-    [InlineData(5, 1, "3 episodes behind")]
-    [InlineData(1, 0, "Caught up")]
-    [InlineData(12, 0, "11 episodes behind")]
-    public void BehindLabel_CountsAiredEpisodesNotTheAiringOne(int airingEpisode, int watched, string expected)
+    [InlineData(4, 4, "Caught up")]
+    [InlineData(4, 5, "Caught up")]
+    [InlineData(4, 9, "Caught up")]
+    [InlineData(4, 3, "1 episode behind")]
+    [InlineData(4, 1, "3 episodes behind")]
+    [InlineData(0, 0, "Caught up")]
+    [InlineData(11, 0, "11 episodes behind")]
+    public void BehindLabel_CountsAiredEpisodesAgainstWatchedOnes(int aired, int watched, string expected)
     {
-        Assert.Equal(expected, AiringTimeFormatter.BehindLabel(airingEpisode, watched));
+        Assert.Equal(expected, AiringTimeFormatter.BehindLabel(aired, watched));
     }
 
     [Theory]
-    [InlineData(5, 4, false)]
-    [InlineData(5, 3, true)]
-    public void IsBehind_AgreesWithTheLabel(int airingEpisode, int watched, bool expected)
+    [InlineData(4, 4, false)]
+    [InlineData(4, 3, true)]
+    public void IsBehind_AgreesWithTheLabel(int aired, int watched, bool expected)
     {
-        Assert.Equal(expected, AiringTimeFormatter.IsBehind(airingEpisode, watched));
+        Assert.Equal(expected, AiringTimeFormatter.IsBehind(aired, watched));
     }
 
     [Fact]

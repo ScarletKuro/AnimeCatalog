@@ -118,7 +118,7 @@ public sealed class CalendarServiceTests
     public void CatalogedTitlesCarryTheirStatusProgressAndAnInternalLink()
     {
         var overlay = Overlay(new CatalogOverlayItem(42, 1, CatalogStatus.Watching, 3, 8m, 12));
-        var load = Load(Schedule(1, new DateTimeOffset(2026, 8, 18, 12, 0, 0, TimeSpan.Zero), episode: 5));
+        var load = Load(Schedule(1, new DateTimeOffset(2026, 8, 18, 12, 0, 0, TimeSpan.Zero), episode: 5, nextAiringEpisode: 5));
 
         var episode = Build(load, overlay).Days[1].Episodes.Single();
 
@@ -127,9 +127,65 @@ public sealed class CalendarServiceTests
         Assert.Equal("anime/42", episode.Href);
         Assert.False(episode.IsExternalHref);
 
-        // Episode 5 airing means 4 have aired; 3 watched leaves 1 outstanding.
+        // Episode 5 is next up, so 4 have aired; 3 watched leaves 1 outstanding.
         Assert.Equal("1 episode behind", episode.CatalogNote);
         Assert.True(episode.IsBehind);
+    }
+
+    // The reported bug. Clevatess season 2 sat on 7 of 13 watched with episode 8 next up, and paging
+    // the calendar forward relabelled it: the row for episode 9 read "1 episode behind" even though
+    // episode 8 had not aired either. Every week has to give the same answer, because being behind is
+    // a fact about now rather than about the week on screen.
+    [Theory]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(12)]
+    public void TheBehindLabelDoesNotChangeWithTheWeekOnScreen(int rowEpisode)
+    {
+        var overlay = Overlay(new CatalogOverlayItem(42, 1, CatalogStatus.Watching, 7, null, 13));
+        var load = Load(Schedule(
+            1,
+            new DateTimeOffset(2026, 8, 19, 12, 0, 0, TimeSpan.Zero),
+            episode: rowEpisode,
+            nextAiringEpisode: 8,
+            totalEpisodes: 13));
+
+        var episode = Build(load, overlay).Days[2].Episodes.Single();
+
+        Assert.Equal("Caught up", episode.CatalogNote);
+        Assert.False(episode.IsBehind);
+    }
+
+    // A finished series has no nextAiringEpisode, so its whole run is what has aired.
+    [Fact]
+    public void AFinishedSeriesCountsEveryEpisodeAsAired()
+    {
+        var overlay = Overlay(new CatalogOverlayItem(42, 1, CatalogStatus.Watching, 5, null, 12));
+        var load = Load(Schedule(
+            1,
+            new DateTimeOffset(2026, 8, 18, 12, 0, 0, TimeSpan.Zero),
+            episode: 12,
+            totalEpisodes: 12));
+
+        var episode = Build(load, overlay).Days[1].Episodes.Single();
+
+        Assert.Equal("7 episodes behind", episode.CatalogNote);
+        Assert.True(episode.IsBehind);
+    }
+
+    // Neither a schedule nor an episode count means there is no honest number to show, and a guess
+    // here is what the old row-derived label amounted to.
+    [Fact]
+    public void NoAiredCountLeavesTheNoteOff()
+    {
+        var overlay = Overlay(new CatalogOverlayItem(42, 1, CatalogStatus.Watching, 3, null, null));
+        var load = Load(Schedule(1, new DateTimeOffset(2026, 8, 18, 12, 0, 0, TimeSpan.Zero), episode: 5));
+
+        var episode = Build(load, overlay).Days[1].Episodes.Single();
+
+        Assert.True(episode.IsCataloged);
+        Assert.Null(episode.CatalogNote);
+        Assert.False(episode.IsBehind);
     }
 
     [Fact]
@@ -444,11 +500,18 @@ public sealed class CalendarServiceTests
     private static CatalogOverlay Overlay(params CatalogOverlayItem[] items) =>
         new(items.ToDictionary(item => item.AniListId), CatalogAccessState.Available);
 
+    /// <summary>
+    /// <paramref name="nextAiringEpisode"/> is what the behind label is derived from, and it is
+    /// deliberately separate from <paramref name="episode"/>: the row being rendered and the episode
+    /// the series is actually up to are only the same thing on the current week.
+    /// </summary>
     private static AniListAiringSchedule Schedule(
         int id,
         DateTimeOffset airsAtUtc,
         int episode = 1,
-        string title = "Title") => new()
+        string title = "Title",
+        int? nextAiringEpisode = null,
+        int? totalEpisodes = null) => new()
     {
         Id = id,
         MediaId = id,
@@ -460,7 +523,11 @@ public sealed class CalendarServiceTests
             Title = new AniListTitle { Romaji = title },
             Format = "TV",
             CountryOfOrigin = "JP",
-            SiteUrl = $"https://anilist.co/anime/{id}"
+            SiteUrl = $"https://anilist.co/anime/{id}",
+            Episodes = totalEpisodes,
+            NextAiringEpisode = nextAiringEpisode is null
+                ? null
+                : new AniListNextAiringEpisode { Episode = nextAiringEpisode.Value }
         }
     };
 }

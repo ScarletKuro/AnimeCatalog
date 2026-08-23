@@ -161,6 +161,7 @@ public sealed class CalendarService
             AirsAtLocal = airsAtLocal,
             Episode = schedule.Episode > 0 ? schedule.Episode : null,
             TotalEpisodes = media.Episodes,
+            EpisodesAired = AiredEpisodeCount(media),
             Format = media.Format,
             Duration = media.Duration,
             CountryOfOrigin = media.CountryOfOrigin,
@@ -169,6 +170,20 @@ public sealed class CalendarService
             Catalog = overlay.IsDecorating ? overlay.Find(media.Id) : null
         };
     }
+
+    /// <summary>
+    /// Episodes broadcast so far. nextAiringEpisode is the one thing that answers this without
+    /// reference to whichever week is on screen: everything below it is out, and its absence means
+    /// the series has finished, so all of them are.
+    /// </summary>
+    /// <remarks>
+    /// Null when AniList offers neither - an ongoing series it holds no schedule for and no episode
+    /// count. Saying nothing is the only honest option there, and the note is dropped.
+    /// </remarks>
+    private static int? AiredEpisodeCount(AniListMedia media) =>
+        media.NextAiringEpisode is { Episode: > 0 } next
+            ? next.Episode - 1
+            : media.Episodes;
 
     private static SeasonArchiveEntryViewModel Project(AniListMedia media, CatalogOverlay overlay) => new()
     {

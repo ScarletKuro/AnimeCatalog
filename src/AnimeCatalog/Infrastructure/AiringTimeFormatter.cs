@@ -83,17 +83,19 @@ public static class AiringTimeFormatter
     }
 
     /// <summary>
-    /// How far behind the owner is on a series whose episode <paramref name="airingEpisode"/> is
-    /// airing now, or null when there is nothing to say.
+    /// How far behind the owner is on a series with <paramref name="episodesAired"/> episodes out.
+    /// This is the fact neither AniChart nor AnimeSchedule can show.
     /// </summary>
     /// <remarks>
-    /// The episode currently airing has not been watchable until now, so the ones that count are the
-    /// <paramref name="airingEpisode"/> - 1 already out. Watching W of those leaves the difference
-    /// outstanding. This is the fact neither AniChart nor AnimeSchedule can show.
+    /// Takes the count of episodes actually broadcast, not the episode number of the row it is being
+    /// rendered against, and the difference is the whole point. Deriving the count from the row read
+    /// the schedule as if every row were airing now, so paging the calendar forward invented a
+    /// backlog: next week's episode 9 became "1 episode behind" while episode 8 had not aired either.
+    /// Being behind is a fact about the present, so it must not change with the week on screen.
     /// </remarks>
-    public static string BehindLabel(int airingEpisode, int episodesWatched)
+    public static string BehindLabel(int episodesAired, int episodesWatched)
     {
-        var behind = airingEpisode - 1 - episodesWatched;
+        var behind = episodesAired - episodesWatched;
 
         return behind switch
         {
@@ -103,7 +105,7 @@ public static class AiringTimeFormatter
         };
     }
 
-    /// <summary>True once <paramref name="airingEpisode"/> leaves the owner with episodes to watch.</summary>
-    public static bool IsBehind(int airingEpisode, int episodesWatched) =>
-        airingEpisode - 1 - episodesWatched > 0;
+    /// <summary>True when <paramref name="episodesAired"/> leaves the owner with episodes to watch.</summary>
+    public static bool IsBehind(int episodesAired, int episodesWatched) =>
+        episodesAired - episodesWatched > 0;
 }
