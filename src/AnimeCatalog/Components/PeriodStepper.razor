@@ -7,7 +7,7 @@
    for a self-describing label cannot apply. That is also why the label between them is not a heading
    or a live region - it is the value of the control, announced by the buttons that change it. *@
 <div class="period-stepper">
-    <button type="button" class="period-stepper__step" aria-label="@PreviousLabel" disabled="@PreviousDisabled" @onclick="OnPrevious">
+    <button type="button" class="icon-button" aria-label="@PreviousLabel" disabled="@PreviousDisabled" @onclick="OnPrevious">
         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
             <path d="M12.25 5.25 7.5 10l4.75 4.75" />
         </svg>
@@ -15,7 +15,7 @@
 
     <p class="period-stepper__value">@Value</p>
 
-    <button type="button" class="period-stepper__step" aria-label="@NextLabel" disabled="@NextDisabled" @onclick="OnNext">
+    <button type="button" class="icon-button" aria-label="@NextLabel" disabled="@NextDisabled" @onclick="OnNext">
         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
             <path d="M7.75 5.25 12.5 10l-4.75 4.75" />
         </svg>

@@ -37,11 +37,11 @@
                                OnPrevious="GoToPreviousWeekAsync"
                                OnNext="GoToNextWeekAsync" />
 
-                <button type="button" class="period-stepper__action" disabled="@IsCurrentWeek" @onclick="GoToCurrentWeekAsync">This week</button>
+                <button type="button" class="icon-button icon-button--wide" disabled="@IsCurrentWeek" @onclick="GoToCurrentWeekAsync">This week</button>
 
                 @if (_isLoading)
                 {
-                    <button type="button" class="period-stepper__step" aria-label="Stop loading" @onclick="CancelLoad">
+                    <button type="button" class="icon-button" aria-label="Stop loading" @onclick="CancelLoad">
                         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
                             <path d="M6.5 6.5 13.5 13.5" />
                             <path d="M13.5 6.5 6.5 13.5" />
@@ -52,7 +52,7 @@
                 {
                     @* Same footprint as the cancel it replaces, so the row does not jump when a load
                        starts or finishes. *@
-                    <button type="button" class="period-stepper__step" aria-label="Reload the schedule" @onclick="ReloadAsync">
+                    <button type="button" class="icon-button" aria-label="Reload the schedule" @onclick="ReloadAsync">
                         <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
                             <path d="M10 4.75A5.25 5.25 0 1 1 4.75 10" />
                             <path d="M3 11.75 4.75 10 6.5 11.75" />

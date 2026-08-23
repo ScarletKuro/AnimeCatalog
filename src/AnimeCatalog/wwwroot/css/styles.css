@@ -1341,8 +1341,7 @@
     .catalog-pager__step,
     .catalog-pager__page,
     .catalog-pager__gap,
-    .period-stepper__step,
-    .period-stepper__action {
+    .icon-button {
         @apply grid h-9 min-w-9 shrink-0 cursor-pointer place-items-center rounded-full border px-2 text-sm font-semibold;
         border-color: rgba(255, 255, 255, 0.08);
         background: rgba(255, 255, 255, 0.04);
@@ -1353,8 +1352,7 @@
     }
 
     .catalog-pager__step:hover:not(:disabled),
-    .period-stepper__step:hover:not(:disabled),
-    .period-stepper__action:hover:not(:disabled),
+    .icon-button:hover:not(:disabled),
     .catalog-pager__page:hover {
         color: var(--text-strong);
         border-color: rgba(158, 240, 255, 0.24);
@@ -1363,8 +1361,7 @@
 
     /* Matches .button:disabled rather than inventing a second disabled look. */
     .catalog-pager__step:disabled,
-    .period-stepper__step:disabled,
-    .period-stepper__action:disabled {
+    .icon-button:disabled {
         @apply cursor-default opacity-65;
     }
 
@@ -1387,7 +1384,7 @@
     }
 
     .catalog-pager__step svg,
-    .period-stepper__step svg {
+    .icon-button svg {
         @apply h-4 w-4;
         fill: none;
         stroke: currentColor;
@@ -1420,7 +1417,7 @@
     /* A word rather than a glyph, so it needs the breathing room a 36px square does not. Everything
        else about it - height, border, hover, disabled - comes from the shared rule above, which is
        the point: it sits in a row of icon buttons and must not be the only one that lifts on hover. */
-    .period-stepper__action {
+    .icon-button--wide {
         @apply px-4;
     }
 

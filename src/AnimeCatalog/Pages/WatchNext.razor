@@ -43,14 +43,27 @@
         <section class="panel" aria-labelledby="missing-progress">
             <div class="panel__header">
                 <h2 id="missing-progress">@ScanHeadline</h2>
-                <div class="button-row">
+                @* Icons rather than pills, and the same pair the calendars use. The scan starts itself
+                   in OnInitializedAsync, so this is a re-fetch of something already on screen rather
+                   than the action that produces it - a primary button overstated it. *@
+                <div class="panel__actions">
                     @if (_isScanning)
                     {
-                        <button type="button" class="button button--ghost" @onclick="CancelScan">Cancel</button>
+                        <button type="button" class="icon-button" aria-label="Stop scanning" @onclick="CancelScan">
+                            <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                                <path d="M6.5 6.5 13.5 13.5" />
+                                <path d="M13.5 6.5 6.5 13.5" />
+                            </svg>
+                        </button>
                     }
                     else
                     {
-                        <button type="button" class="button button--primary" @onclick="StartScanAsync">Rescan</button>
+                        <button type="button" class="icon-button" aria-label="Rescan the catalog" @onclick="StartScanAsync">
+                            <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                                <path d="M10 4.75A5.25 5.25 0 1 1 4.75 10" />
+                                <path d="M3 11.75 4.75 10 6.5 11.75" />
+                            </svg>
+                        </button>
                     }
                 </div>
             </div>

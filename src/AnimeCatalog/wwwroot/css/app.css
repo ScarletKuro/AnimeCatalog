@@ -1782,7 +1782,7 @@
     gap: calc(var(--spacing) * 1.5);
     padding: 0px;
   }
-  .catalog-pager__step, .catalog-pager__page, .catalog-pager__gap, .period-stepper__step, .period-stepper__action {
+  .catalog-pager__step, .catalog-pager__page, .catalog-pager__gap, .icon-button {
     display: grid;
     height: calc(var(--spacing) * 9);
     min-width: calc(var(--spacing) * 9);
@@ -1803,12 +1803,12 @@
     transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
     font-variant-numeric: tabular-nums;
   }
-  .catalog-pager__step:hover:not(:disabled), .period-stepper__step:hover:not(:disabled), .period-stepper__action:hover:not(:disabled), .catalog-pager__page:hover {
+  .catalog-pager__step:hover:not(:disabled), .icon-button:hover:not(:disabled), .catalog-pager__page:hover {
     color: var(--text-strong);
     border-color: rgba(158, 240, 255, 0.24);
     background: rgba(158, 240, 255, 0.1);
   }
-  .catalog-pager__step:disabled, .period-stepper__step:disabled, .period-stepper__action:disabled {
+  .catalog-pager__step:disabled, .icon-button:disabled {
     cursor: default;
     opacity: 65%;
   }
@@ -1827,7 +1827,7 @@
     border-color: transparent;
     background-color: transparent;
   }
-  .catalog-pager__step svg, .period-stepper__step svg {
+  .catalog-pager__step svg, .icon-button svg {
     height: calc(var(--spacing) * 4);
     width: calc(var(--spacing) * 4);
     fill: none;
@@ -1860,7 +1860,7 @@
     justify-content: flex-end;
     gap: calc(var(--spacing) * 2);
   }
-  .period-stepper__action {
+  .icon-button--wide {
     padding-inline: calc(var(--spacing) * 4);
   }
   .franchise-card, .poster-card {
