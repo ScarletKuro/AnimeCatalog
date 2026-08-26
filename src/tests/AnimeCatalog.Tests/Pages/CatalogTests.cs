@@ -37,7 +37,7 @@ public sealed class CatalogTests
         var cut = context.Render<Catalog>();
         access.Complete(canRead: false);
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup);
             Assert.Single(cut.FindAll(".access-card"));
@@ -54,7 +54,7 @@ public sealed class CatalogTests
         var cut = context.Render<Catalog>();
         access.Complete(canRead: true);
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Single(cut.FindAll(".filters-card"));
             Assert.Contains("No entries match the current filters.", cut.Markup);
@@ -96,7 +96,7 @@ public sealed class CatalogTests
         var cut = RenderCatalog(context);
         var readsAfterFirstLoad = supabase.SelectCount;
 
-        cut.Find(".catalog-pager [aria-label='Next page']").Click();
+        await cut.Find(".catalog-pager [aria-label='Next page']").ClickAsync();
 
         Assert.Equal(TitleFor(49), cut.FindAll(".franchise-card__title")[0].TextContent);
         Assert.Equal(readsAfterFirstLoad, supabase.SelectCount);
@@ -113,9 +113,9 @@ public sealed class CatalogTests
         var cut = RenderCatalog(context);
         var readsAfterFirstLoad = supabase.SelectCount;
 
-        cut.Find(".filters-card input").Input(TitleFor(7));
+        await cut.Find(".filters-card input").InputAsync(TitleFor(7));
 
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".franchise-card")));
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".franchise-card")));
         Assert.Equal(readsAfterFirstLoad, supabase.SelectCount);
     }
 
@@ -126,7 +126,7 @@ public sealed class CatalogTests
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = RenderCatalog(context);
-        cut.Find(".catalog-pager [aria-label='Next page']").Click();
+        await cut.Find(".catalog-pager [aria-label='Next page']").ClickAsync();
 
         // No "?q=&status=&sort=Title" noise alongside it: a default that is spelled out is a default
         // somebody has to read past.
@@ -140,7 +140,7 @@ public sealed class CatalogTests
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = RenderCatalog(context, "catalog?page=2");
-        cut.Find(".catalog-pager [aria-label='Previous page']").Click();
+        await cut.Find(".catalog-pager [aria-label='Previous page']").ClickAsync();
 
         Assert.EndsWith("catalog", navigation.Uri);
     }
@@ -176,7 +176,7 @@ public sealed class CatalogTests
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = RenderCatalog(context);
-        cut.Find(".catalog-pager [aria-label='Page 3']").Click();
+        await cut.Find(".catalog-pager [aria-label='Page 3']").ClickAsync();
 
         Assert.EndsWith("catalog?page=3", navigation.Uri);
         Assert.Equal(TitleFor(97), cut.FindAll(".franchise-card__title")[0].TextContent);
@@ -191,11 +191,11 @@ public sealed class CatalogTests
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = RenderCatalog(context);
-        cut.Find("[aria-label='Page 21']").Click();
+        await cut.Find("[aria-label='Page 21']").ClickAsync();
 
         Assert.EndsWith("catalog?page=21", navigation.Uri);
 
-        cut.Find("[aria-label='Page 1']").Click();
+        await cut.Find("[aria-label='Page 1']").ClickAsync();
 
         Assert.EndsWith("catalog", navigation.Uri);
     }
@@ -378,9 +378,9 @@ public sealed class CatalogTests
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = RenderCatalog(context, "catalog?page=3");
-        cut.Find(".filters-card input").Input(TitleFor(7));
+        await cut.Find(".filters-card input").InputAsync(TitleFor(7));
 
-        cut.WaitForAssertion(() => Assert.EndsWith($"catalog?q={TitleFor(7)}", navigation.Uri));
+        await cut.WaitForAssertionAsync(() => Assert.EndsWith($"catalog?q={TitleFor(7)}", navigation.Uri));
     }
 
     [Fact]
@@ -416,13 +416,13 @@ public sealed class CatalogTests
 
         var cut = RenderCatalog(context);
         var expandedTitle = cut.FindAll(".franchise-card__title")[0].TextContent;
-        cut.FindAll(".franchise-card__toggle")[0].Click();
+        await cut.FindAll(".franchise-card__toggle")[0].ClickAsync();
 
         // Seeded so that sorting by year exactly reverses the title order: a sort that left the grid
         // alone could not tell a keyed loop from an unkeyed one.
-        cut.FindAll(".filters-card select")[1].Change(nameof(CatalogSortOption.Year));
+        await cut.FindAll(".filters-card select")[1].ChangeAsync(nameof(CatalogSortOption.Year));
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             var expanded = cut.Find(".franchise-card--expanded");
             Assert.Equal(expandedTitle, expanded.QuerySelector(".franchise-card__title")!.TextContent);

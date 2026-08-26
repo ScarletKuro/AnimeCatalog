@@ -69,7 +69,7 @@ public sealed class LoginTests
 
         // The failure used to replace the whole action with an ErrorState card, which left a failed
         // callback with nothing to click.
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Equal("Sign in to Anime Catalog", cut.Find("h1").TextContent);
             Assert.NotEmpty(cut.FindAll(".action-feedback--error"));
@@ -90,10 +90,10 @@ public sealed class LoginTests
 
         // With no PKCE verifier in storage the exchange throws before any request is made, and that
         // exception message stands in for the Supabase error payload a real failure would carry.
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("button.disclosure")));
+        await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("button.disclosure")));
         Assert.DoesNotContain("PKCE code verifier", cut.Markup);
 
-        cut.Find("button.disclosure").Click();
+        await cut.Find("button.disclosure").ClickAsync();
 
         Assert.Contains("PKCE code verifier", cut.Find(".login-card__detail").TextContent);
     }

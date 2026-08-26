@@ -24,13 +24,13 @@ public sealed class AuthChangeReloadTests
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = context.Render<Catalog>();
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".filters-card")));
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".filters-card")));
 
         var uriBeforeSignOut = navigation.Uri;
         access.CanRead = false;
         auth.SignOut();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup);
             Assert.Empty(cut.FindAll(".filters-card"));
@@ -49,13 +49,13 @@ public sealed class AuthChangeReloadTests
         var navigation = context.Services.GetRequiredService<NavigationManager>();
 
         var cut = context.Render<Catalog>();
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".filters-card")));
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".filters-card")));
 
         var uriBeforeSignOut = navigation.Uri;
         access.CanRead = false;
         auth.SignOut();
 
-        cut.WaitForAssertion(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
 
         Assert.EndsWith("catalog?q=g&sort=Year", navigation.Uri);
         Assert.Equal(uriBeforeSignOut, navigation.Uri);
@@ -67,12 +67,12 @@ public sealed class AuthChangeReloadTests
         await using var context = CreateContext(string.Empty, out var access, out var auth);
 
         var cut = context.Render<Home>();
-        cut.WaitForAssertion(() => Assert.DoesNotContain(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.DoesNotContain(CatalogAccess.PrivateMessage, cut.Markup));
 
         access.CanRead = false;
         auth.SignOut();
 
-        cut.WaitForAssertion(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
     }
 
     [Fact]
@@ -81,12 +81,12 @@ public sealed class AuthChangeReloadTests
         await using var context = CreateContext("franchise/gundam", out var access, out var auth);
 
         var cut = context.Render<Franchise>(parameters => parameters.Add(p => p.Slug, "gundam"));
-        cut.WaitForAssertion(() => Assert.DoesNotContain(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.DoesNotContain(CatalogAccess.PrivateMessage, cut.Markup));
 
         access.CanRead = false;
         auth.SignOut();
 
-        cut.WaitForAssertion(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
     }
 
     [Fact]
@@ -95,12 +95,12 @@ public sealed class AuthChangeReloadTests
         await using var context = CreateContext("anime/174", out var access, out var auth);
 
         var cut = context.Render<AnimeDetails>(parameters => parameters.Add(p => p.Id, 174L));
-        cut.WaitForAssertion(() => Assert.DoesNotContain(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.DoesNotContain(CatalogAccess.PrivateMessage, cut.Markup));
 
         access.CanRead = false;
         auth.SignOut();
 
-        cut.WaitForAssertion(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
     }
 
     [Fact]
@@ -112,20 +112,20 @@ public sealed class AuthChangeReloadTests
         await using var context = CreateContext("catalog", out var access, out var auth);
 
         var cut = context.Render<Catalog>();
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".filters-card")));
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".filters-card")));
 
         access.CanRead = false;
         access.HoldTheNextCheck();
         auth.SignOut();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Empty(cut.FindAll(".filters-card"));
             Assert.Contains("Loading catalog...", cut.Markup);
         });
 
         access.ReleaseTheHeldCheck();
-        cut.WaitForAssertion(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup));
     }
 
     [Fact]
@@ -137,10 +137,10 @@ public sealed class AuthChangeReloadTests
         await using var context = CreateContext("catalog", out var access, out var auth);
 
         var cut = context.Render<Catalog>();
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".filters-card")));
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".filters-card")));
 
-        cut.Find(".text-input").Input("cowboy bebop");
-        cut.WaitForAssertion(() => Assert.Equal("cowboy bebop", cut.Find(".text-input").GetAttribute("value")));
+        await cut.Find(".text-input").InputAsync("cowboy bebop");
+        await cut.WaitForAssertionAsync(() => Assert.Equal("cowboy bebop", cut.Find(".text-input").GetAttribute("value")));
 
         var checksBeforeRefresh = access.CheckCount;
         auth.RaiseWithoutIdentityChange();

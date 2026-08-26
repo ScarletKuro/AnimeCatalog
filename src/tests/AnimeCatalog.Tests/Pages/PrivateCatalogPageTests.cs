@@ -1,6 +1,5 @@
 using AnimeCatalog.Infrastructure;
 using AnimeCatalog.Models.AniList;
-using AnimeCatalog.Models.Supabase;
 using AnimeCatalog.Options;
 using AnimeCatalog.Pages;
 using AnimeCatalog.Services;
@@ -8,7 +7,6 @@ using AnimeCatalog.State;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 
 namespace AnimeCatalog.Tests.Pages;
@@ -22,7 +20,7 @@ public sealed class PrivateCatalogPageTests
 
         var cut = context.Render<Home>();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Contains(CatalogAccess.PrivateTitle, cut.Markup);
             Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup);
@@ -37,7 +35,7 @@ public sealed class PrivateCatalogPageTests
 
         var cut = context.Render<Catalog>();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Contains(CatalogAccess.PrivateTitle, cut.Markup);
             Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup);
@@ -53,7 +51,7 @@ public sealed class PrivateCatalogPageTests
 
         var cut = context.Render<Franchise>(parameters => parameters.Add(p => p.Slug, "gundam"));
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Contains(CatalogAccess.PrivateTitle, cut.Markup);
             Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup);
@@ -68,7 +66,7 @@ public sealed class PrivateCatalogPageTests
 
         var cut = context.Render<AnimeDetails>(parameters => parameters.Add(p => p.Id, 174L));
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Contains(CatalogAccess.PrivateTitle, cut.Markup);
             Assert.Contains(CatalogAccess.PrivateMessage, cut.Markup);

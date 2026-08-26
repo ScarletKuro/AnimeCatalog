@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using AnimeCatalog.Infrastructure;
-using AnimeCatalog.Models;
 using AnimeCatalog.Models.Supabase;
 using AnimeCatalog.Options;
 using AnimeCatalog.Services;

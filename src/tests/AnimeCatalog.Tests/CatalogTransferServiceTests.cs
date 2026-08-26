@@ -226,7 +226,7 @@ public sealed class CatalogTransferServiceTests
 
         Assert.Equal(1, result.EntriesCreated);
         // The rejected entry must not have written anything at all.
-        Assert.Single(supabase.Upserts.Where(call => call.Table == "anime_entries"));
+        Assert.Single(supabase.Upserts, call => call.Table == "anime_entries");
     }
 
     [Fact]

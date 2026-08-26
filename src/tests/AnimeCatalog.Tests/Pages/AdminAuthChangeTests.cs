@@ -30,11 +30,11 @@ public sealed class AdminAuthChangeTests
         await authService.InitializeAsync();
 
         var cut = context.Render<Dashboard>();
-        cut.WaitForAssertion(() => Assert.Contains("Catalog visibility", cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.Contains("Catalog visibility", cut.Markup));
 
         await authService.LogoutAsync();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Contains("Authentication required", cut.Markup);
             Assert.DoesNotContain("Catalog visibility", cut.Markup);

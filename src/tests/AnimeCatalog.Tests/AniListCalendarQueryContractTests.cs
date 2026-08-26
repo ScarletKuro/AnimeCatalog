@@ -1,6 +1,4 @@
-using System.Text.Json;
 using AnimeCatalog.Models.AniList;
-using AnimeCatalog.Services;
 
 namespace AnimeCatalog.Tests;
 

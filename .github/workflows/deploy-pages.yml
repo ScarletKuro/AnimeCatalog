@@ -101,13 +101,17 @@ jobs:
 
       - name: Verify published assets
         run: |
-          for f in index.html 404.html css/app.css appsettings.json .nojekyll; do
+          for f in index.html 404.html css/app.css appsettings.json robots.txt .nojekyll; do
             test -e "publish/wwwroot/$f" || { echo "::error::missing: $f"; exit 1; }
           done
-          for f in index.html 404.html css/app.css appsettings.json; do
+          for f in index.html 404.html css/app.css appsettings.json robots.txt; do
             test -s "publish/wwwroot/$f" || { echo "::error::empty: $f"; exit 1; }
           done
           test -d publish/wwwroot/_framework || { echo "::error::missing _framework"; exit 1; }
+          for f in index.html 404.html; do
+            grep -q 'name="robots"' "publish/wwwroot/$f" \
+              || { echo "::error::robots meta tag missing from $f"; exit 1; }
+          done
 
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
