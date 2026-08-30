@@ -63,6 +63,16 @@ public sealed class AnimeEditorModel : IValidatableObject
                 [nameof(EpisodesWatched)]);
         }
 
+        // The dates fill themselves in from the status, so only a hand-typed pair can end up this way
+        // round. No rule the other direction: a Completed entry without a date is reconciled on the
+        // way out, and demanding one here would only block a title fix on a row saved before that.
+        if (StartedAt is { } started && CompletedAt is { } completed && completed < started)
+        {
+            yield return new ValidationResult(
+                "A completion date cannot come before the start date.",
+                [nameof(CompletedAt)]);
+        }
+
         if (FranchiseAssignmentMode == FranchiseAssignmentMode.CreateNew &&
             string.IsNullOrWhiteSpace(NewFranchiseTitle))
         {

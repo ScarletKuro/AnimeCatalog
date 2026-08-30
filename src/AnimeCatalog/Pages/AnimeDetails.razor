@@ -6,6 +6,7 @@
 @inject AdminCatalogService AdminCatalogService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
+@inject TimeProvider Clock
 
 <PageTitle>@_pageTitle</PageTitle>
 
@@ -156,8 +157,10 @@
                                    Variant="success" />
 
                         <dl class="details-list">
-                            <div><dt>Started</dt><dd>@(_details.CatalogEntry.StartedAt?.ToString("yyyy-MM-dd") ?? "n/a")</dd></div>
-                            <div><dt>Completed</dt><dd>@(_details.CatalogEntry.CompletedAt?.ToString("yyyy-MM-dd") ?? "n/a")</dd></div>
+                            @* Same argument as the meter above: the status picker moves these two,
+                               so they follow the pending edit rather than contradicting it. *@
+                            <div><dt>Started</dt><dd>@DisplayedStartedAt</dd></div>
+                            <div><dt>Completed</dt><dd>@DisplayedCompletedAt</dd></div>
                             <div><dt>Notes</dt><dd>@(!string.IsNullOrWhiteSpace(_details.CatalogEntry.Notes) ? _details.CatalogEntry.Notes : "No notes.")</dd></div>
                         </dl>
                     </div>
@@ -380,6 +383,10 @@
     private CatalogStatus _editStatus;
     private decimal? _editScore;
     private int _editEpisodesWatched;
+    // Not editable here -- they ride along so CatalogProgressDates can see what the row already
+    // holds and leave an existing date alone instead of restamping it with today.
+    private DateOnly? _editStartedAt;
+    private DateOnly? _editCompletedAt;
     private bool _hasPendingEdits;
     private bool _isSaving;
     private ActionFeedback? _saveFeedback;
@@ -560,6 +567,8 @@
         _editStatus = _details!.CatalogEntry.Status;
         _editScore = _details.CatalogEntry.Score;
         _editEpisodesWatched = _details.CatalogEntry.EpisodesWatched;
+        _editStartedAt = _details.CatalogEntry.StartedAt;
+        _editCompletedAt = _details.CatalogEntry.CompletedAt;
         _hasPendingEdits = false;
     }
 
@@ -578,6 +587,7 @@
             _editEpisodesWatched,
             status,
             _details?.AnimeEntry.Episodes);
+        ReconcileDates();
 
         _hasPendingEdits = true;
         _saveFeedback = null;
@@ -610,11 +620,23 @@
         // entry rather than leaving a count that contradicts the status. IsEditable then puts the
         // field away and the StatMeter below carries the count on its own.
         _editStatus = EpisodePicker.ReconcileStatus(episodes, _editStatus, _details?.AnimeEntry.Episodes);
+        ReconcileDates();
 
         _hasPendingEdits = true;
         _saveFeedback = null;
         return Task.CompletedTask;
     }
+
+    // Last in both handlers, after the status has settled: picking the last episode promotes the
+    // entry, and a date stamped before that promotion would answer for the old status. The service
+    // applies the same rule on the way out; doing it here too is what lets the Started and
+    // Completed rows above follow the pickers instead of lagging until the save lands.
+    private void ReconcileDates() =>
+        (_editStartedAt, _editCompletedAt) = CatalogProgressDates.Reconcile(
+            _editStatus,
+            _editStartedAt,
+            _editCompletedAt,
+            CatalogProgressDates.Today(Clock));
 
     private async Task SaveCatalogEntryAsync()
     {
@@ -631,7 +653,9 @@
                 _details.AnimeEntry.Id,
                 _editStatus,
                 _editScore,
-                _editEpisodesWatched);
+                _editEpisodesWatched,
+                _editStartedAt,
+                _editCompletedAt);
 
             await LoadAsync();
             _saveFeedback = ActionFeedback.Success("Saved");
@@ -702,6 +726,14 @@
     // Admins see what they are about to save; everyone else sees what is stored.
     private int DisplayedEpisodesWatched =>
         AuthService.IsAdmin ? _editEpisodesWatched : _details!.CatalogEntry.EpisodesWatched;
+
+    private string DisplayedStartedAt =>
+        FormatDate(AuthService.IsAdmin ? _editStartedAt : _details!.CatalogEntry.StartedAt);
+
+    private string DisplayedCompletedAt =>
+        FormatDate(AuthService.IsAdmin ? _editCompletedAt : _details!.CatalogEntry.CompletedAt);
+
+    private static string FormatDate(DateOnly? date) => date?.ToString("yyyy-MM-dd") ?? "n/a";
 
     private string EpisodeProgressText
     {

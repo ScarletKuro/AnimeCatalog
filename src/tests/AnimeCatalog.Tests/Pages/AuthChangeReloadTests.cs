@@ -160,6 +160,8 @@ public sealed class AuthChangeReloadTests
         access = new SwitchableCatalogAccessService();
         auth = new StubAuthStateNotifier("owner", isAdmin: true);
 
+        // AnimeDetails reads the clock to stamp the progress dates its status picker decides.
+        context.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero)));
         context.Services.AddSingleton<IAuthStateNotifier>(auth);
         context.Services.AddSingleton<ICatalogAccessService>(access);
         context.Services.AddSingleton<ISupabaseRestService>(new EmptySupabaseRestService());

@@ -1,3 +1,5 @@
+@inject TimeProvider Clock
+
 <EditForm Model="Model" OnValidSubmit="OnValidSubmit" OnInvalidSubmit="OnInvalidSubmit" class="editor-form">
     <DataAnnotationsValidator />
     <ValidationSummary class="validation-summary" />
@@ -43,6 +45,18 @@
                 <span class="field-label">Score</span>
                 <ScorePicker @bind-Value="Model.Score" />
             </div>
+            @* Both dates fill themselves in as the status moves, so these are for correcting one --
+               a show finished last month, an import that never carried a date. Each is shown only
+               under the statuses that can hold it, since CatalogProgressDates has just blanked it
+               under the others and an empty box would only invite contradicting the status. *@
+            @if (Model.Status != CatalogStatus.Planned)
+            {
+                <label class="field"><span class="field-label">Started</span><InputDate TValue="DateOnly?" class="text-input" @bind-Value="Model.StartedAt" /></label>
+            }
+            @if (Model.Status == CatalogStatus.Completed)
+            {
+                <label class="field"><span class="field-label">Completed</span><InputDate TValue="DateOnly?" class="text-input" @bind-Value="Model.CompletedAt" /></label>
+            }
             <label class="field field--wide"><span class="field-label">Cover URL</span><input class="text-input" @bind="Model.CoverUrl" /></label>
             <label class="field field--wide"><span class="field-label">Notes</span><InputTextArea class="text-area" @bind-Value="Model.Notes" /></label>
         </div>
@@ -167,6 +181,7 @@
 
         Model.Status = status;
         SyncWatchedToTotal();
+        ReconcileDates();
 
         return Task.CompletedTask;
     }
@@ -178,9 +193,21 @@
     {
         Model.EpisodesWatched = episodes;
         Model.Status = EpisodePicker.ReconcileStatus(episodes, Model.Status, Model.Episodes);
+        ReconcileDates();
 
         return Task.CompletedTask;
     }
+
+    // Last in both handlers, after the status has settled: the rule reads the final status, so
+    // running it before ReconcileStatus could promote the entry would stamp the wrong one. The
+    // service applies the same rule on the way out -- doing it here as well is what lets the date
+    // fields above appear, disappear and fill in while the form is still open.
+    private void ReconcileDates() =>
+        (Model.StartedAt, Model.CompletedAt) = CatalogProgressDates.Reconcile(
+            Model.Status,
+            Model.StartedAt,
+            Model.CompletedAt,
+            CatalogProgressDates.Today(Clock));
 
     // Both the status picker and the editable total feed this: either can put the two fields out
     // of step, and nothing else would catch the drift -- the picker offers no range at all while

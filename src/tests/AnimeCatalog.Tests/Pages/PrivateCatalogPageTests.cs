@@ -84,6 +84,8 @@ public sealed class PrivateCatalogPageTests
         var franchiseService = new FranchiseService();
 
         context.Services.AddSingleton<IAuthStateNotifier>(sp => sp.GetRequiredService<AuthService>());
+        // AnimeDetails reads the clock to stamp the progress dates its status picker decides.
+        context.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero)));
         context.Services.AddSingleton<ICatalogAccessService>(accessService);
         context.Services.AddSingleton(sp => new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()));
         context.Services.AddSingleton<ISupabaseRestService>(supabase);

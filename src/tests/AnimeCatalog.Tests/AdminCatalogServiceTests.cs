@@ -8,6 +8,9 @@ namespace AnimeCatalog.Tests;
 
 public sealed class AdminCatalogServiceTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 8, 31, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateOnly Today = new(2026, 8, 31);
+
     [Fact]
     public async Task SaveAsync_NewAnime_CreatesCatalogEntry()
     {
@@ -126,6 +129,10 @@ public sealed class AdminCatalogServiceTests
 
         Assert.Equal(CatalogStatus.Completed, draft.Status);
         Assert.Equal(24, draft.EpisodesWatched);
+
+        // No status handler fires for a draft's default, so the date is seeded here or the entry is
+        // saved as Completed with nothing for the home page to sort it by.
+        Assert.Equal(Today, draft.CompletedAt);
     }
 
     [Fact]
@@ -152,22 +159,148 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6, null, null);
 
         var upsert = Assert.Single(supabase.UpsertCalls);
         Assert.Equal("catalog_entries", upsert.Table);
         Assert.Equal("anime_entry_id", upsert.OnConflictColumn);
 
-        // Only the four columns the inline editor owns are sent. notes, started_at and completed_at
-        // are deliberately absent so a PostgREST merge-duplicates upsert leaves them untouched.
+        // Only the columns the inline editor owns are sent. notes stays deliberately absent so a
+        // PostgREST merge-duplicates upsert leaves it untouched; the dates are sent because the
+        // status pill decides them.
         var payload = upsert.Payload.GetType().GetProperties().Select(property => property.Name).ToList();
         Assert.Equal(
-            ["anime_entry_id", "status", "score", "episodes_watched"],
+            ["anime_entry_id", "status", "score", "episodes_watched", "started_at", "completed_at"],
             payload);
 
         // A status click must not touch anime_entries or re-sync anime_relations.
         Assert.Empty(supabase.InsertCalls);
     }
+
+    // The inline pills are the fast path the original bug report used, so the rule has to reach them
+    // and not just the full editor.
+    [Fact]
+    public async Task UpdateCatalogEntryAsync_StampsTheCompletionDate()
+    {
+        var supabase = new FakeSupabaseRestService();
+        var service = CreateService(
+            supabase,
+            snapshot: new RepositorySnapshot([], [], [], []),
+            aniListMedia: CreateMedia(198113));
+
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Completed, 8.5m, 16, null, null);
+
+        Assert.Equal(Today, ReadDate(Assert.Single(supabase.UpsertCalls).Payload, "completed_at"));
+    }
+
+    [Fact]
+    public async Task UpdateCatalogEntryAsync_KeepsACompletionDateTheRowAlreadyHas()
+    {
+        var supabase = new FakeSupabaseRestService();
+        var service = CreateService(
+            supabase,
+            snapshot: new RepositorySnapshot([], [], [], []),
+            aniListMedia: CreateMedia(198113));
+
+        var stored = new DateOnly(2024, 3, 4);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Completed, 8.5m, 16, null, stored);
+
+        Assert.Equal(stored, ReadDate(Assert.Single(supabase.UpsertCalls).Payload, "completed_at"));
+    }
+
+    [Fact]
+    public async Task UpdateCatalogEntryAsync_ClearsTheCompletionDateWhenTheStatusLeavesCompleted()
+    {
+        var supabase = new FakeSupabaseRestService();
+        var service = CreateService(
+            supabase,
+            snapshot: new RepositorySnapshot([], [], [], []),
+            aniListMedia: CreateMedia(198113));
+
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, null, 15, new DateOnly(2024, 3, 4), Today);
+
+        var payload = Assert.Single(supabase.UpsertCalls).Payload;
+        Assert.Null(ReadDate(payload, "completed_at"));
+        Assert.Equal(new DateOnly(2024, 3, 4), ReadDate(payload, "started_at"));
+    }
+
+    // The write boundary applies the rule too, so a draft or a page that never fired a status
+    // handler cannot store a date its status contradicts.
+    [Fact]
+    public async Task SaveAsync_ClearsADateTheStatusForbids()
+    {
+        var supabase = new FakeSupabaseRestService();
+        supabase.NextInsertIds["anime_entries"] = 101;
+        supabase.CatalogEntryExistsByAnimeEntryId[101] = true;
+        var service = CreateService(
+            supabase,
+            snapshot: new RepositorySnapshot([], [], [], []),
+            aniListMedia: CreateMedia(198113));
+
+        await service.SaveAsync(new AnimeEditorModel
+        {
+            AniListId = 198113,
+            TitleRomaji = "Kill Ao",
+            Status = CatalogStatus.Watching,
+            EpisodesWatched = 5,
+            CompletedAt = new DateOnly(2024, 3, 4)
+        });
+
+        var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
+        Assert.Null(ReadDate(upsert.Payload, "completed_at"));
+    }
+
+    [Fact]
+    public async Task SaveAsync_StampsACompletedEntryThatCarriesNoDate()
+    {
+        var supabase = new FakeSupabaseRestService();
+        supabase.NextInsertIds["anime_entries"] = 101;
+        supabase.CatalogEntryExistsByAnimeEntryId[101] = true;
+        var service = CreateService(
+            supabase,
+            snapshot: new RepositorySnapshot([], [], [], []),
+            aniListMedia: CreateMedia(198113));
+
+        await service.SaveAsync(new AnimeEditorModel
+        {
+            AniListId = 198113,
+            TitleRomaji = "Kill Ao",
+            Status = CatalogStatus.Completed,
+            EpisodesWatched = 16
+        });
+
+        var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
+        Assert.Equal(Today, ReadDate(upsert.Payload, "completed_at"));
+    }
+
+    // A hand-typed date is an answer, not a gap to fill.
+    [Fact]
+    public async Task SaveAsync_KeepsAHandTypedCompletionDate()
+    {
+        var supabase = new FakeSupabaseRestService();
+        supabase.NextInsertIds["anime_entries"] = 101;
+        supabase.CatalogEntryExistsByAnimeEntryId[101] = true;
+        var service = CreateService(
+            supabase,
+            snapshot: new RepositorySnapshot([], [], [], []),
+            aniListMedia: CreateMedia(198113));
+
+        var typed = new DateOnly(2019, 5, 5);
+        await service.SaveAsync(new AnimeEditorModel
+        {
+            AniListId = 198113,
+            TitleRomaji = "Kill Ao",
+            Status = CatalogStatus.Completed,
+            EpisodesWatched = 16,
+            CompletedAt = typed
+        });
+
+        var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
+        Assert.Equal(typed, ReadDate(upsert.Payload, "completed_at"));
+    }
+
+    private static DateOnly? ReadDate(object payload, string propertyName) =>
+        (DateOnly?)payload.GetType().GetProperty(propertyName)!.GetValue(payload);
 
     [Fact]
     public async Task UpdateCatalogEntryAsync_RejectsAnOutOfRangeScore()
@@ -179,10 +312,10 @@ public sealed class AdminCatalogServiceTests
             aniListMedia: CreateMedia(198113));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 11m, 6));
+            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 11m, 6, null, null));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, null, -1));
+            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, null, -1, null, null));
 
         Assert.Empty(supabase.UpsertCalls);
     }
@@ -347,7 +480,7 @@ public sealed class AdminCatalogServiceTests
         var catalog = new FakeCatalogService(new RepositorySnapshot([], [], [], []));
         var service = CreateService(new FakeSupabaseRestService(), catalog, CreateMedia(198113));
 
-        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6, null, null);
 
         Assert.Equal(1, catalog.CacheInvalidations);
     }
@@ -417,7 +550,8 @@ public sealed class AdminCatalogServiceTests
             supabase,
             new FakeAniListService(aniListMedia),
             new FakeAdminAuthorizationService(),
-            catalogService);
+            catalogService,
+            new FixedTimeProvider(Now));
     }
 
     private static AniListMedia CreateMedia(int id, string englishTitle = "KILL BLUE", IEnumerable<int>? relationAniListIds = null, int? episodes = null)

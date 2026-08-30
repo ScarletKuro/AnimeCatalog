@@ -13,17 +13,24 @@ public sealed class AdminCatalogService
     private readonly IAniListService _aniListService;
     private readonly IAdminAuthorizationService _authService;
     private readonly ICatalogService _catalogService;
+    private readonly TimeProvider _timeProvider;
 
+    /// <param name="timeProvider">
+    /// Trailing and optional so the existing call sites keep compiling, matching CatalogService.
+    /// Only the progress dates need it.
+    /// </param>
     public AdminCatalogService(
         ISupabaseRestService supabaseRestService,
         IAniListService aniListService,
         IAdminAuthorizationService authService,
-        ICatalogService catalogService)
+        ICatalogService catalogService,
+        TimeProvider? timeProvider = null)
     {
         _supabaseRestService = supabaseRestService;
         _aniListService = aniListService;
         _authService = authService;
         _catalogService = catalogService;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task EnsureAdminOrThrowAsync(CancellationToken cancellationToken = default)
@@ -77,7 +84,7 @@ public sealed class AdminCatalogService
 
         var snapshot = await _catalogService.GetSnapshotAsync(cancellationToken);
 
-        return BuildDraft(media, snapshot);
+        return BuildDraft(media, snapshot, CatalogProgressDates.Today(_timeProvider));
     }
 
     /// <summary>
@@ -108,11 +115,11 @@ public sealed class AdminCatalogService
             ExistingEntry = existing,
             ExistingFranchise = franchise,
             Relations = BuildRelationSuggestions(media, snapshot),
-            Draft = existing is null ? BuildDraft(media, snapshot) : null
+            Draft = existing is null ? BuildDraft(media, snapshot, CatalogProgressDates.Today(_timeProvider)) : null
         };
     }
 
-    private static AnimeEditorModel BuildDraft(AniListMedia media, RepositorySnapshot snapshot)
+    private static AnimeEditorModel BuildDraft(AniListMedia media, RepositorySnapshot snapshot, DateOnly today)
     {
         var suggestedFranchise = FindSuggestedFranchise(media, snapshot);
 
@@ -130,10 +137,12 @@ public sealed class AdminCatalogService
             StartDate = media.StartDate?.ToDateOnly(),
             EndDate = media.EndDate?.ToDateOnly(),
             Status = CatalogStatus.Completed,
-            // Mirrors AnimeEditorForm.HandleStatusChangedAsync, which fills this in when the user
+            // Mirrors AnimeEditorForm.HandleStatusChangedAsync, which fills these in when the user
             // switches to Completed. A default never fires that handler, so do it here or the
-            // draft opens as Completed with 0 episodes watched. Null for currently-airing shows.
+            // draft opens as Completed with 0 episodes watched and no completion date. The episode
+            // count is null for currently-airing shows.
             EpisodesWatched = media.Episodes ?? 0,
+            CompletedAt = today,
             FranchiseId = suggestedFranchise?.Id,
             FranchiseAssignmentMode = suggestedFranchise is null ? FranchiseAssignmentMode.None : FranchiseAssignmentMode.Existing,
             SuggestedFranchiseTitle = suggestedFranchise?.Title,
@@ -235,6 +244,16 @@ public sealed class AdminCatalogService
             }, cancellationToken);
         }
 
+        // Locals rather than writing back onto the model, the way franchiseId above is resolved: the
+        // caller owns the instance it passed in. The rule runs here as well as in the form so that a
+        // draft, an import-corrected row or a page that never fired a status handler still cannot
+        // store a date its status contradicts.
+        var (startedAt, completedAt) = CatalogProgressDates.Reconcile(
+            model.Status,
+            model.StartedAt,
+            model.CompletedAt,
+            CatalogProgressDates.Today(_timeProvider));
+
         await _supabaseRestService.UpsertSingleAsync<CatalogEntryRow>("catalog_entries", new
         {
             anime_entry_id = targetAnimeEntryId.Value,
@@ -242,8 +261,8 @@ public sealed class AdminCatalogService
             score = model.Score,
             episodes_watched = model.EpisodesWatched,
             notes = model.Notes,
-            started_at = model.StartedAt,
-            completed_at = model.CompletedAt
+            started_at = startedAt,
+            completed_at = completedAt
         }, "anime_entry_id", cancellationToken);
 
         var verifiedCatalogEntry = await _supabaseRestService.SelectSingleAsync<CatalogEntryRow>(
@@ -276,11 +295,18 @@ public sealed class AdminCatalogService
     /// model and calls <c>ReplaceRelationsAsync</c>, which round-trips AniList. Clicking a status pill
     /// should not cost an AniList request or risk touching anime_relations.
     /// </remarks>
+    /// <param name="startedAt">
+    /// The dates the row already carries. They are not editable from the inline controls, but the
+    /// status is, and a status decides which dates may exist -- so they come along to be reconciled
+    /// rather than left behind to contradict the status that was just picked.
+    /// </param>
     public async Task UpdateCatalogEntryAsync(
         long animeEntryId,
         CatalogStatus status,
         decimal? score,
         int episodesWatched,
+        DateOnly? startedAt,
+        DateOnly? completedAt,
         CancellationToken cancellationToken = default)
     {
         await EnsureAdminOrThrowAsync(cancellationToken);
@@ -295,12 +321,23 @@ public sealed class AdminCatalogService
             throw new ArgumentOutOfRangeException(nameof(score), score, "Score must be between 0 and 10.");
         }
 
+        var (reconciledStartedAt, reconciledCompletedAt) = CatalogProgressDates.Reconcile(
+            status,
+            startedAt,
+            completedAt,
+            CatalogProgressDates.Today(_timeProvider));
+
+        // notes is still absent on purpose: a PostgREST merge-duplicates upsert leaves out what it is
+        // not sent, and that column is not this editor's to touch. The dates are, now that the status
+        // pill decides them.
         await _supabaseRestService.UpsertSingleAsync<CatalogEntryRow>("catalog_entries", new
         {
             anime_entry_id = animeEntryId,
             status = status.ToApiValue(),
             score,
-            episodes_watched = episodesWatched
+            episodes_watched = episodesWatched,
+            started_at = reconciledStartedAt,
+            completed_at = reconciledCompletedAt
         }, "anime_entry_id", cancellationToken);
 
         // The inline status and score controls sit on a page that reads back through the snapshot, so

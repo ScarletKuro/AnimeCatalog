@@ -11,6 +11,9 @@ namespace AnimeCatalog.Tests.Components;
 
 public sealed class AnimeEditorFormTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 8, 31, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateOnly Today = new(2026, 8, 31);
+
     [Fact]
     public async Task CompletedStatus_FillsWatchedEpisodesToTotalEpisodes()
     {
@@ -243,17 +246,126 @@ public sealed class AnimeEditorFormTests
         Assert.Contains("Episodes watched", cut.Markup);
     }
 
+    // The bug this whole rule exists for: the home page's recently-completed list reads the date and
+    // never the status, so finishing a show without stamping one left the list permanently empty.
+    [Fact]
+    public async Task CompletedStatus_StampsTheCompletionDate()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        Status(cut, "Completed").Click();
+
+        Assert.Equal(Today, model.CompletedAt);
+    }
+
+    // Same promotion, reached from the count instead of the picker -- the path the original report
+    // took, stepping 15 to 16 of 16.
+    [Fact]
+    public async Task PickingTheLastEpisode_StampsTheCompletionDate()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+        model.Status = CatalogStatus.Watching;
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        cut.FindAll(".episode-picker__option")[^1].Click();
+
+        Assert.Equal(CatalogStatus.Completed, model.Status);
+        Assert.Equal(Today, model.CompletedAt);
+    }
+
+    [Fact]
+    public async Task LeavingCompleted_ClearsTheCompletionDate()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        Status(cut, "Completed").Click();
+        Status(cut, "Watching").Click();
+
+        Assert.Null(model.CompletedAt);
+    }
+
+    // Starting to watch is the moment a start date exists; finishing is not, since a show added as
+    // already-watched was not started today.
+    [Fact]
+    public async Task WatchingStatus_StampsTheStartDateOnly()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        Status(cut, "Watching").Click();
+
+        Assert.Equal(Today, model.StartedAt);
+        Assert.Null(model.CompletedAt);
+    }
+
+    [Fact]
+    public async Task CompletedStatus_DoesNotInventAStartDate()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        Status(cut, "Completed").Click();
+
+        Assert.Null(model.StartedAt);
+    }
+
+    // Each field is offered only under the statuses that can hold its date, the same way the watched
+    // count puts itself away while Completed.
+    [Fact]
+    public async Task TheDateFields_FollowTheStatusesThatCanHoldThem()
+    {
+        await using var context = CreateContext();
+        var model = CreateModel();
+
+        var cut = context.Render<AnimeEditorForm>(parameters => parameters
+            .Add(p => p.Model, model)
+            .Add(p => p.Franchises, Array.Empty<Franchise>()));
+
+        // Planned owns neither date, Watching owns a start date, Completed owns both.
+        Assert.Empty(cut.FindAll("input[type=date]"));
+
+        Status(cut, "Watching").Click();
+        Assert.Single(cut.FindAll("input[type=date]"));
+
+        Status(cut, "Completed").Click();
+        Assert.Equal(2, cut.FindAll("input[type=date]").Count);
+    }
+
     private static IElement Status(IRenderedComponent<AnimeEditorForm> cut, string label) =>
         cut.FindAll(".status-picker__option")
             .Single(button => button.TextContent.Contains(label, StringComparison.Ordinal));
 
     // EpisodePicker reaches for BrowserStorageService to keep the selected option inside its
-    // scrolled track, so the form now needs the same JS plumbing the page tests use.
+    // scrolled track, so the form now needs the same JS plumbing the page tests use. The clock is
+    // the form's own: the status pickers stamp the progress dates.
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton(sp => new BrowserStorageService(sp.GetRequiredService<IJSRuntime>()));
+        context.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(Now));
         return context;
     }
 

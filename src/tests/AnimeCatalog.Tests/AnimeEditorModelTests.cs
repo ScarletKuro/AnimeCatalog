@@ -69,6 +69,41 @@ public sealed class AnimeEditorModelTests
         Assert.Empty(Validate(model));
     }
 
+    // Both dates fill themselves in from the status, so only a hand-typed pair can end up this way
+    // round -- which is exactly why the editable fields need a rule behind them.
+    [Fact]
+    public void FinishingBeforeStarting_IsRejected()
+    {
+        var model = CreateModel();
+        model.StartedAt = new DateOnly(2026, 8, 31);
+        model.CompletedAt = new DateOnly(2026, 8, 30);
+
+        Assert.Contains(Validate(model), result =>
+            result.ErrorMessage == "A completion date cannot come before the start date.");
+    }
+
+    [Fact]
+    public void StartingAndFinishingOnTheSameDay_IsFine()
+    {
+        var model = CreateModel();
+        model.StartedAt = new DateOnly(2026, 8, 31);
+        model.CompletedAt = new DateOnly(2026, 8, 31);
+
+        Assert.Empty(Validate(model));
+    }
+
+    // Rows saved before the dates existed carry neither, and a title fix must not be held hostage to
+    // inventing one.
+    [Fact]
+    public void MissingDates_AreNotDemanded()
+    {
+        var model = CreateModel();
+        model.Status = CatalogStatus.Completed;
+        model.EpisodesWatched = 25;
+
+        Assert.Empty(Validate(model));
+    }
+
     private static IReadOnlyList<ValidationResult> Validate(AnimeEditorModel model)
     {
         var results = new List<ValidationResult>();
