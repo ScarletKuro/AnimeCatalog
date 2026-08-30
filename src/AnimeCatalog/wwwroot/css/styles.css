@@ -1169,8 +1169,15 @@
         @apply justify-center;
     }
 
+    /* Micro-caps label, same treatment as .score-split__label and .stat-card span. Deliberately
+       not text-sm: the hints and readouts these labels sit above (.episode-picker__hint,
+       .episode-picker__value, .score-picker__value, .franchise-picker__hint) are all text-sm on
+       --text-soft, so a label matching them in size, weight and colour read as one more line of
+       prose rather than as the name of the control under it. Casing and tracking carry the
+       distinction, which leaves the colour free to stay muted -- the control, not its label, is
+       what the eye should land on. */
     .field-label {
-        @apply text-sm;
+        @apply text-[0.68rem] font-bold uppercase tracking-[0.18em];
         color: var(--text-soft);
     }
 
@@ -1270,10 +1277,10 @@
        confirm it, a visibility toggle that flipped. It sits under the button it belongs to
        rather than beside it - in a flex row a long error message shoves the button around.
 
-       Deliberately below .field-label's text-sm. At the same size and the same --text-soft it
-       was indistinguishable from the field labels stacked above it, so the receipt read as one
-       more label rather than as an answer to the click. Colour carries the outcome: muted is
-       only the neutral base, and every caller is expected to pick a variant. */
+       Deliberately below the text-sm body copy it sits among: this is an answer to a click, not
+       a field of its own, and at the same size and the same --text-soft it read as one more
+       label rather than as a receipt. Colour carries the outcome: muted is only the neutral
+       base, and every caller is expected to pick a variant. */
     .action-feedback {
         @apply m-0 flex flex-wrap items-center gap-2 text-[0.78rem];
         color: var(--text-soft);

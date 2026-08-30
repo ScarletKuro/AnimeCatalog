@@ -1613,8 +1613,12 @@
     justify-content: center;
   }
   .field-label {
-    font-size: var(--text-sm);
-    line-height: var(--tw-leading, var(--text-sm--line-height));
+    font-size: 0.68rem;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    --tw-tracking: 0.18em;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: var(--text-soft);
   }
   .text-input, .text-area, .select-input {
