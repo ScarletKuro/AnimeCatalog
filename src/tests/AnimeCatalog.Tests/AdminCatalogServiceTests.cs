@@ -118,6 +118,49 @@ public sealed class AdminCatalogServiceTests
     }
 
     [Fact]
+    public async Task CreateDraftFromAniListAsync_DoesNotSuggestFranchiseFromOtherRelation()
+    {
+        const long soulEaterFranchiseId = 42;
+        var soulEater = new AnimeEntry
+        {
+            Id = 3588,
+            AniListId = 3588,
+            FranchiseId = soulEaterFranchiseId,
+            TitleRomaji = "Soul Eater"
+        };
+
+        var soulEaterFranchise = new Franchise
+        {
+            Id = soulEaterFranchiseId,
+            Title = "Soul Eater",
+            Slug = "soul-eater"
+        };
+
+        var media = CreateMedia(179062, "Fire Force Season 3 Part 2");
+        media.Relations = new AniListRelationConnection
+        {
+            Edges =
+            [
+                RelationEdge("PREQUEL", 149118, "ANIME", "TV", "Fire Force Season 3"),
+                RelationEdge("SOURCE", 86310, "MANGA", "MANGA", "Fire Force"),
+                RelationEdge("OTHER", 3588, "ANIME", "TV", "Soul Eater")
+            ]
+        };
+
+        var service = CreateService(
+            new FakeSupabaseRestService(),
+            snapshot: new RepositorySnapshot([soulEater], [], [], [soulEaterFranchise]),
+            aniListMedia: media);
+
+        var draft = await service.CreateDraftFromAniListAsync(179062);
+
+        Assert.Equal(FranchiseAssignmentMode.None, draft.FranchiseAssignmentMode);
+        Assert.Null(draft.FranchiseId);
+        Assert.Null(draft.SuggestedFranchiseTitle);
+        Assert.Equal("Fire Force Season 3 Part 2", draft.SuggestedNewFranchiseTitle);
+    }
+
+    [Fact]
     public async Task CreateDraftFromAniListAsync_DefaultsToCompletedWithEpisodesWatchedPrefilled()
     {
         var service = CreateService(

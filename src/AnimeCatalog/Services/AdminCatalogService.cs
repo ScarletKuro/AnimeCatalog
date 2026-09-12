@@ -428,6 +428,7 @@ public sealed class AdminCatalogService
     {
         var relatedAniListIds = media.Relations?.Edges
             .Where(edge => edge.Node is not null)
+            .Where(edge => AnimeRelationRules.IsTraversable(edge.RelationType))
             .Select(edge => edge.Node!.Id)
             .ToHashSet()
             ?? [];
