@@ -112,12 +112,67 @@
 
 @layer components {
     .shell {
-        @apply min-h-screen;
+        @apply flex min-h-screen flex-col;
     }
 
     .main-content {
         width: min(1320px, calc(100% - 2rem));
         @apply mx-auto pt-8 pb-16;
+        flex: 1 0 auto;
+    }
+
+    .site-footer {
+        @apply pb-8;
+        flex: 0 0 auto;
+    }
+
+    .site-footer__inner {
+        width: min(1320px, calc(100% - 2rem));
+        @apply mx-auto flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[0.72rem] font-semibold;
+        color: color-mix(in srgb, var(--text-soft) 72%, transparent);
+    }
+
+    .site-footer__link,
+    .site-footer__commit {
+        @apply inline-flex items-center;
+        min-height: 1.75rem;
+    }
+
+    .site-footer__link,
+    .site-footer__commit {
+        @apply rounded-full transition duration-150 ease-in-out;
+        color: inherit;
+    }
+
+    .site-footer__link {
+        @apply gap-1.5 px-2;
+    }
+
+    .site-footer__commit {
+        @apply px-2 font-mono;
+    }
+
+    .site-footer__link::after {
+        content: "·";
+        margin-left: 0.75rem;
+        color: rgba(255, 255, 255, 0.18);
+    }
+
+    .site-footer__icon svg {
+        @apply h-3.5 w-3.5;
+        fill: currentColor;
+    }
+
+    .site-footer__link:hover,
+    .site-footer__commit:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .site-footer__link:focus-visible,
+    .site-footer__commit:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 3px;
     }
 
     /* The sticky header overlaps anything scrollIntoView brings to the top of the viewport, so every
