@@ -118,9 +118,10 @@ public sealed class AdminCatalogServiceTests
     }
 
     [Fact]
-    public async Task CreateDraftFromAniListAsync_DoesNotSuggestFranchiseFromOtherRelation()
+    public async Task CreateDraftFromAniListAsync_SuggestsContinuityFranchiseOverOtherRelation()
     {
-        const long soulEaterFranchiseId = 42;
+        const long soulEaterFranchiseId = 6;
+        const long fireForceFranchiseId = 115;
         var soulEater = new AnimeEntry
         {
             Id = 3588,
@@ -129,11 +130,26 @@ public sealed class AdminCatalogServiceTests
             TitleRomaji = "Soul Eater"
         };
 
+        var fireForceSeason3 = new AnimeEntry
+        {
+            Id = 149118,
+            AniListId = 149118,
+            FranchiseId = fireForceFranchiseId,
+            TitleRomaji = "Enen no Shouboutai: San no Shou",
+            TitleEnglish = "Fire Force Season 3"
+        };
+
         var soulEaterFranchise = new Franchise
         {
             Id = soulEaterFranchiseId,
             Title = "Soul Eater",
             Slug = "soul-eater"
+        };
+        var fireForceFranchise = new Franchise
+        {
+            Id = fireForceFranchiseId,
+            Title = "Fire Force",
+            Slug = "fire-force"
         };
 
         var media = CreateMedia(179062, "Fire Force Season 3 Part 2");
@@ -149,14 +165,14 @@ public sealed class AdminCatalogServiceTests
 
         var service = CreateService(
             new FakeSupabaseRestService(),
-            snapshot: new RepositorySnapshot([soulEater], [], [], [soulEaterFranchise]),
+            snapshot: new RepositorySnapshot([soulEater, fireForceSeason3], [], [], [soulEaterFranchise, fireForceFranchise]),
             aniListMedia: media);
 
         var draft = await service.CreateDraftFromAniListAsync(179062);
 
-        Assert.Equal(FranchiseAssignmentMode.None, draft.FranchiseAssignmentMode);
-        Assert.Null(draft.FranchiseId);
-        Assert.Null(draft.SuggestedFranchiseTitle);
+        Assert.Equal(FranchiseAssignmentMode.Existing, draft.FranchiseAssignmentMode);
+        Assert.Equal(fireForceFranchiseId, draft.FranchiseId);
+        Assert.Equal("Fire Force", draft.SuggestedFranchiseTitle);
         Assert.Equal("Fire Force Season 3 Part 2", draft.SuggestedNewFranchiseTitle);
     }
 

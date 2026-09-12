@@ -27,8 +27,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.6" PrivateAssets="all" />
-    <PackageReference Include="Tailwind.Hosting" Version="1.2.2" />
-    <PackageReference Include="Tailwind.Hosting.Build" Version="1.2.2">
+    <PackageReference Include="Tailwind.Hosting" Version="1.2.4" />
+    <PackageReference Include="Tailwind.Hosting.Build" Version="1.2.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
