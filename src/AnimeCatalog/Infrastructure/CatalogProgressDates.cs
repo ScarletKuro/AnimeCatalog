@@ -3,18 +3,16 @@ using AnimeCatalog.Models;
 namespace AnimeCatalog.Infrastructure;
 
 /// <summary>
-/// The started/completed dates a catalog status implies.
+/// The started/completed dates a catalog status allows.
 /// </summary>
 /// <remarks>
-/// Both editors and the write boundary call this rather than each stamping dates by hand, the same
-/// way they all share <c>EpisodePicker</c>'s status and count rules -- three copies of "Completed
-/// means there is a completion date" would drift.
+/// Both editors and the write boundary call this rather than each deciding which dates survive by
+/// hand, the same way they all share <c>EpisodePicker</c>'s status and count rules.
 /// <para>
 /// A pure function of the row rather than of what changed, so it is idempotent and also repairs a
-/// row that was already inconsistent when it loaded. The invariant it keeps is that a completion
-/// date and Completed status imply each other: the home page, the year counters and the catalog's
-/// recently-completed sort all read the date and never the status, so a stale date would leave a
-/// half-watched show sitting in a list of finished ones.
+/// row that was already inconsistent when it loaded. The invariant it keeps is one-way: statuses
+/// that are not Completed cannot carry a completion date. Completed may still have an unknown
+/// completion date, because old entries are often remembered as finished without the exact day.
 /// </para>
 /// <para>
 /// Deliberately not applied by <c>CatalogTransferService</c>: an import restores a backup verbatim,
@@ -34,8 +32,9 @@ public static class CatalogProgressDates
         DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
     /// <param name="today">
-    /// The date to stamp with. Callers pass the clock's value rather than reading it here, so tests
-    /// and the two editors agree on what "today" is within one interaction.
+    /// The date to stamp with when a status implies a new start date. Callers pass the clock's
+    /// value rather than reading it here, so tests and the two editors agree on what "today" is
+    /// within one interaction.
     /// </param>
     public static (DateOnly? StartedAt, DateOnly? CompletedAt) Reconcile(
         CatalogStatus status,
@@ -50,9 +49,9 @@ public static class CatalogProgressDates
             // keeps it, so passing back through Watching after a pause does not reset the date.
             CatalogStatus.Watching => (startedAt ?? today, null),
 
-            // Finishing stamps the completion date but never invents a start date: a show added to
-            // the catalog as already-finished was not started today, and a guess would read as fact.
-            CatalogStatus.Completed => (startedAt, completedAt ?? today),
+            // Completed may mean "finished long ago, date unknown", so saving cannot invent a date.
+            // The UI stamps today when the user actively switches into Completed.
+            CatalogStatus.Completed => (startedAt, completedAt),
 
             // On hold and dropped both mean started-but-not-finished, so the start date stands and
             // the completion date cannot.

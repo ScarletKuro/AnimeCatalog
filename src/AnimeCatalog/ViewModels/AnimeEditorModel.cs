@@ -63,9 +63,8 @@ public sealed class AnimeEditorModel : IValidatableObject
                 [nameof(EpisodesWatched)]);
         }
 
-        // The dates fill themselves in from the status, so only a hand-typed pair can end up this way
-        // round. No rule the other direction: a Completed entry without a date is reconciled on the
-        // way out, and demanding one here would only block a title fix on a row saved before that.
+        // Date fields can be edited independently. A Completed entry may keep an unknown completion
+        // date, but a typed completion date still cannot come before a typed start date.
         if (StartedAt is { } started && CompletedAt is { } completed && completed < started)
         {
             yield return new ValidationResult(

@@ -582,11 +582,13 @@
             return Task.CompletedTask;
         }
 
+        var previousStatus = _editStatus;
         _editStatus = status;
         _editEpisodesWatched = EpisodePicker.ReconcileWatchedCount(
             _editEpisodesWatched,
             status,
             _details?.AnimeEntry.Episodes);
+        StampCompletionDateIfNeeded(previousStatus);
         ReconcileDates();
 
         _hasPendingEdits = true;
@@ -614,12 +616,14 @@
             return Task.CompletedTask;
         }
 
+        var previousStatus = _editStatus;
         _editEpisodesWatched = episodes;
 
         // Reaching the last episode is what finishing a show means, so the picker promotes the
         // entry rather than leaving a count that contradicts the status. IsEditable then puts the
         // field away and the StatMeter below carries the count on its own.
         _editStatus = EpisodePicker.ReconcileStatus(episodes, _editStatus, _details?.AnimeEntry.Episodes);
+        StampCompletionDateIfNeeded(previousStatus);
         ReconcileDates();
 
         _hasPendingEdits = true;
@@ -628,15 +632,24 @@
     }
 
     // Last in both handlers, after the status has settled: picking the last episode promotes the
-    // entry, and a date stamped before that promotion would answer for the old status. The service
-    // applies the same rule on the way out; doing it here too is what lets the Started and
-    // Completed rows above follow the pickers instead of lagging until the save lands.
+    // entry, and reconciling before that promotion would clear or keep dates for the old status.
+    // Doing it here lets the Started and Completed rows above follow the pickers immediately.
     private void ReconcileDates() =>
         (_editStartedAt, _editCompletedAt) = CatalogProgressDates.Reconcile(
             _editStatus,
             _editStartedAt,
             _editCompletedAt,
             CatalogProgressDates.Today(Clock));
+
+    private void StampCompletionDateIfNeeded(CatalogStatus previousStatus)
+    {
+        if (previousStatus != CatalogStatus.Completed &&
+            _editStatus == CatalogStatus.Completed &&
+            _editCompletedAt is null)
+        {
+            _editCompletedAt = CatalogProgressDates.Today(Clock);
+        }
+    }
 
     private async Task SaveCatalogEntryAsync()
     {

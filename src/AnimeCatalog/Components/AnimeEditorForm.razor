@@ -179,8 +179,10 @@
             return Task.CompletedTask;
         }
 
+        var previousStatus = Model.Status;
         Model.Status = status;
         SyncWatchedToTotal();
+        StampCompletionDateIfNeeded(previousStatus);
         ReconcileDates();
 
         return Task.CompletedTask;
@@ -191,23 +193,34 @@
     // since a Completed entry states its count through the Episodes field above.
     private Task HandleEpisodesChangedAsync(int episodes)
     {
+        var previousStatus = Model.Status;
         Model.EpisodesWatched = episodes;
         Model.Status = EpisodePicker.ReconcileStatus(episodes, Model.Status, Model.Episodes);
+        StampCompletionDateIfNeeded(previousStatus);
         ReconcileDates();
 
         return Task.CompletedTask;
     }
 
     // Last in both handlers, after the status has settled: the rule reads the final status, so
-    // running it before ReconcileStatus could promote the entry would stamp the wrong one. The
-    // service applies the same rule on the way out -- doing it here as well is what lets the date
-    // fields above appear, disappear and fill in while the form is still open.
+    // running it before ReconcileStatus could promote the entry would clear or keep dates for the
+    // wrong status. The service applies the same allowed-date rule on the way out.
     private void ReconcileDates() =>
         (Model.StartedAt, Model.CompletedAt) = CatalogProgressDates.Reconcile(
             Model.Status,
             Model.StartedAt,
             Model.CompletedAt,
             CatalogProgressDates.Today(Clock));
+
+    private void StampCompletionDateIfNeeded(CatalogStatus previousStatus)
+    {
+        if (previousStatus != CatalogStatus.Completed &&
+            Model.Status == CatalogStatus.Completed &&
+            Model.CompletedAt is null)
+        {
+            Model.CompletedAt = CatalogProgressDates.Today(Clock);
+        }
+    }
 
     // Both the status picker and the editable total feed this: either can put the two fields out
     // of step, and nothing else would catch the drift -- the picker offers no range at all while

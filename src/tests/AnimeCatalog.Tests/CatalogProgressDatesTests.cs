@@ -9,15 +9,15 @@ public sealed class CatalogProgressDatesTests
     private static readonly DateOnly Earlier = new(2024, 3, 4);
 
     [Fact]
-    public void CompletedWithoutADate_IsStampedWithToday()
+    public void CompletedWithoutADate_StaysUnknown()
     {
         var (_, completedAt) = CatalogProgressDates.Reconcile(CatalogStatus.Completed, null, null, Today);
 
-        Assert.Equal(Today, completedAt);
+        Assert.Null(completedAt);
     }
 
-    // The point of the editable field: a date typed by hand, or restored from a backup, is an answer
-    // the rule has no business improving on.
+    // The point of the editable field: a date typed by hand, cleared because it is unknown, or
+    // restored from a backup is an answer the rule has no business improving on.
     [Fact]
     public void CompletedWithADate_KeepsIt()
     {
@@ -62,9 +62,8 @@ public sealed class CatalogProgressDatesTests
         Assert.Equal(Earlier, startedAt);
     }
 
-    // The rule the home page depends on: the recently-completed list, the year counters and the
-    // catalog's completion sort all read the date and never the status, so a date left behind by a
-    // status change would show a half-watched entry among the finished ones.
+    // The rule the home page depends on: dated completion lists can omit an unknown date, but a
+    // date left behind by a status change would show a half-watched entry among the finished ones.
     [Theory]
     [InlineData(CatalogStatus.Planned)]
     [InlineData(CatalogStatus.Watching)]

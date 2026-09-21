@@ -236,10 +236,8 @@ public sealed class AdminCatalogServiceTests
         Assert.Empty(supabase.InsertCalls);
     }
 
-    // The inline pills are the fast path the original bug report used, so the rule has to reach them
-    // and not just the full editor.
     [Fact]
-    public async Task UpdateCatalogEntryAsync_StampsTheCompletionDate()
+    public async Task UpdateCatalogEntryAsync_PreservesAnUnknownCompletionDate()
     {
         var supabase = new FakeSupabaseRestService();
         var service = CreateService(
@@ -249,7 +247,7 @@ public sealed class AdminCatalogServiceTests
 
         await service.UpdateCatalogEntryAsync(101, CatalogStatus.Completed, 8.5m, 16, null, null);
 
-        Assert.Equal(Today, ReadDate(Assert.Single(supabase.UpsertCalls).Payload, "completed_at"));
+        Assert.Null(ReadDate(Assert.Single(supabase.UpsertCalls).Payload, "completed_at"));
     }
 
     [Fact]
@@ -310,7 +308,7 @@ public sealed class AdminCatalogServiceTests
     }
 
     [Fact]
-    public async Task SaveAsync_StampsACompletedEntryThatCarriesNoDate()
+    public async Task SaveAsync_PreservesACompletedEntryWithAnUnknownCompletionDate()
     {
         var supabase = new FakeSupabaseRestService();
         supabase.NextInsertIds["anime_entries"] = 101;
@@ -329,7 +327,40 @@ public sealed class AdminCatalogServiceTests
         });
 
         var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
-        Assert.Equal(Today, ReadDate(upsert.Payload, "completed_at"));
+        Assert.Null(ReadDate(upsert.Payload, "completed_at"));
+    }
+
+    [Fact]
+    public async Task SaveAsync_CanCreateAFranchiseWithoutInventingACompletionDate()
+    {
+        var supabase = new FakeSupabaseRestService();
+        supabase.NextInsertIds["franchises"] = 7;
+        supabase.CatalogEntryExistsByAnimeEntryId[3] = true;
+        var existing = new AnimeEntry
+        {
+            Id = 3,
+            AniListId = 198113,
+            TitleRomaji = "Kill Ao"
+        };
+        var service = CreateService(
+            supabase,
+            snapshot: new RepositorySnapshot([existing], [], [], []),
+            aniListMedia: CreateMedia(198113));
+
+        await service.SaveAsync(new AnimeEditorModel
+        {
+            AnimeEntryId = existing.Id,
+            AniListId = existing.AniListId,
+            TitleRomaji = existing.TitleRomaji,
+            Status = CatalogStatus.Completed,
+            EpisodesWatched = 16,
+            FranchiseAssignmentMode = FranchiseAssignmentMode.CreateNew,
+            NewFranchiseTitle = "Kill Blue"
+        });
+
+        Assert.Contains(supabase.InsertCalls, call => call.Table == "franchises");
+        var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
+        Assert.Null(ReadDate(upsert.Payload, "completed_at"));
     }
 
     // A hand-typed date is an answer, not a gap to fill.
