@@ -16,7 +16,7 @@ public sealed class AniListBrowseServiceTests
         var aniList = new StubAniListService { AiringPages = [Schedules(50), Schedules(50), Schedules(7)] };
         var service = Create(aniList);
 
-        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(107, load.Schedules.Count);
         Assert.Equal(3, aniList.AiringCallCount);
@@ -36,7 +36,7 @@ public sealed class AniListBrowseServiceTests
         };
         var service = Create(aniList);
 
-        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(50, load.Schedules.Count);
         Assert.Equal(2, aniList.AiringCallCount);
@@ -53,7 +53,7 @@ public sealed class AniListBrowseServiceTests
         };
         var service = Create(aniList);
 
-        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(AniListBrowseService.MaxAiringPages, aniList.AiringCallCount);
         Assert.True(load.WasTruncated);
@@ -73,7 +73,7 @@ public sealed class AniListBrowseServiceTests
         // page, plus a final one", which is observable synchronously.
         var reports = new RecordingProgress();
 
-        await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, reports);
+        await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, reports, TestContext.Current.CancellationToken);
 
         // Three page reports plus the final one.
         Assert.Equal(4, reports.Reports.Count);
@@ -91,7 +91,7 @@ public sealed class AniListBrowseServiceTests
         var service = Create(aniList);
 
         await Assert.ThrowsAsync<AniListUnavailableException>(
-            () => service.GetAiringSchedulesAsync(WindowStart, WindowEnd));
+            () => service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     // Losing page three is not worth throwing away the two that arrived.
@@ -106,7 +106,7 @@ public sealed class AniListBrowseServiceTests
         };
         var service = Create(aniList);
 
-        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(100, load.Schedules.Count);
         Assert.False(load.IsComplete);
@@ -127,7 +127,7 @@ public sealed class AniListBrowseServiceTests
         };
         var service = Create(aniList);
 
-        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(last, load.CompleteThrough);
     }
@@ -138,7 +138,7 @@ public sealed class AniListBrowseServiceTests
         var aniList = new StubAniListService { AiringPages = [Schedules(0)] };
         var service = Create(aniList);
 
-        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(load.Schedules);
         Assert.Null(load.CompleteThrough);
@@ -151,10 +151,10 @@ public sealed class AniListBrowseServiceTests
         var aniList = new StubAniListService { AiringPages = [Schedules(10)] };
         var service = Create(aniList);
 
-        await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
         var afterFirst = aniList.AiringCallCount;
 
-        await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(afterFirst, aniList.AiringCallCount);
     }
@@ -166,8 +166,8 @@ public sealed class AniListBrowseServiceTests
         var aniList = new StubAniListService { AiringPages = [Schedules(5)], Gate = gate.Task };
         var service = Create(aniList);
 
-        var first = service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
-        var second = service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var first = service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
+        var second = service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
 
         gate.SetResult();
         await Task.WhenAll(first, second);
@@ -183,8 +183,8 @@ public sealed class AniListBrowseServiceTests
 
         var request = new AniListBrowseRequest { SeasonYear = 2011, Season = "SPRING" };
 
-        await service.GetBrowsePageAsync(request, 1);
-        await service.GetBrowsePageAsync(request, 1);
+        await service.GetBrowsePageAsync(request, 1, TestContext.Current.CancellationToken);
+        await service.GetBrowsePageAsync(request, 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, aniList.BrowseCallCount);
     }
@@ -195,8 +195,8 @@ public sealed class AniListBrowseServiceTests
         var aniList = new StubAniListService { BrowsePages = [Media(50), Media(50)] };
         var service = Create(aniList);
 
-        await service.GetBrowsePageAsync(new AniListBrowseRequest { SeasonYear = 2011, Sort = "POPULARITY_DESC" }, 1);
-        await service.GetBrowsePageAsync(new AniListBrowseRequest { SeasonYear = 2011, Sort = "SCORE_DESC" }, 1);
+        await service.GetBrowsePageAsync(new AniListBrowseRequest { SeasonYear = 2011, Sort = "POPULARITY_DESC" }, 1, TestContext.Current.CancellationToken);
+        await service.GetBrowsePageAsync(new AniListBrowseRequest { SeasonYear = 2011, Sort = "SCORE_DESC" }, 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, aniList.BrowseCallCount);
     }
@@ -208,11 +208,9 @@ public sealed class AniListBrowseServiceTests
         var aniList = new StubAniListService { BrowsePages = [Media(50)] };
         var service = Create(aniList);
 
-        await service.GetBrowsePageAsync(
-            new AniListBrowseRequest { SeasonYear = 2011, Formats = ["TV", "MOVIE"], Genres = ["Action", "Drama"] }, 1);
+        await service.GetBrowsePageAsync(new AniListBrowseRequest { SeasonYear = 2011, Formats = ["TV", "MOVIE"], Genres = ["Action", "Drama"] }, 1, TestContext.Current.CancellationToken);
 
-        await service.GetBrowsePageAsync(
-            new AniListBrowseRequest { SeasonYear = 2011, Formats = ["MOVIE", "TV"], Genres = ["Drama", "Action"] }, 1);
+        await service.GetBrowsePageAsync(new AniListBrowseRequest { SeasonYear = 2011, Formats = ["MOVIE", "TV"], Genres = ["Drama", "Action"] }, 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, aniList.BrowseCallCount);
     }
@@ -225,8 +223,8 @@ public sealed class AniListBrowseServiceTests
 
         var request = new AniListBrowseRequest { SeasonYear = 2011 };
 
-        await service.GetBrowsePageAsync(request, 1);
-        await service.GetBrowsePageAsync(request, 2);
+        await service.GetBrowsePageAsync(request, 1, TestContext.Current.CancellationToken);
+        await service.GetBrowsePageAsync(request, 2, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, aniList.BrowseCallCount);
     }
@@ -239,8 +237,8 @@ public sealed class AniListBrowseServiceTests
 
         var request = new AniListBrowseRequest { SeasonYear = 2011 };
 
-        await Assert.ThrowsAsync<AniListUnavailableException>(() => service.GetBrowsePageAsync(request, 1));
-        await Assert.ThrowsAsync<AniListUnavailableException>(() => service.GetBrowsePageAsync(request, 1));
+        await Assert.ThrowsAsync<AniListUnavailableException>(() => service.GetBrowsePageAsync(request, 1, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<AniListUnavailableException>(() => service.GetBrowsePageAsync(request, 1, TestContext.Current.CancellationToken));
 
         // The second attempt came from the cached failure, not from the network.
         Assert.Equal(1, aniList.BrowseCallCount);
@@ -259,7 +257,7 @@ public sealed class AniListBrowseServiceTests
             () => service.GetAiringSchedulesAsync(WindowStart, WindowEnd, null, cts.Token));
 
         // Nothing was cached as a refusal, so a fresh read still works.
-        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd);
+        var load = await service.GetAiringSchedulesAsync(WindowStart, WindowEnd, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(5, load.Schedules.Count);
     }
 

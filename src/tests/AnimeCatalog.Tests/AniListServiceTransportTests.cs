@@ -30,7 +30,7 @@ public sealed class AniListServiceTransportTests
         var service = Create(handler);
 
         var exception = await Assert.ThrowsAsync<AniListUnavailableException>(
-            () => service.SearchAnimeAsync("frieren"));
+            () => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.Equal(403, exception.StatusCode);
         Assert.Contains("temporarily disabled", exception.ServerMessage);
@@ -48,7 +48,7 @@ public sealed class AniListServiceTransportTests
         var handler = new StubHandler((HttpStatusCode)403, DisabledApiBody);
         var service = Create(handler);
 
-        await Assert.ThrowsAsync<AniListUnavailableException>(() => service.SearchAnimeAsync("frieren"));
+        await Assert.ThrowsAsync<AniListUnavailableException>(() => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.Equal(1, handler.CallCount);
     }
@@ -62,7 +62,7 @@ public sealed class AniListServiceTransportTests
         ]);
         var service = Create(handler);
 
-        var results = await service.SearchAnimeAsync("frieren");
+        var results = await service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
         Assert.Equal(2, handler.CallCount);
@@ -75,7 +75,7 @@ public sealed class AniListServiceTransportTests
         var service = Create(handler);
 
         var exception = await Assert.ThrowsAsync<AniListUnavailableException>(
-            () => service.SearchAnimeAsync("frieren"));
+            () => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.Equal(502, exception.StatusCode);
         Assert.Equal(3, handler.CallCount);
@@ -88,7 +88,7 @@ public sealed class AniListServiceTransportTests
         var service = Create(handler);
 
         var exception = await Assert.ThrowsAsync<AniListUnavailableException>(
-            () => service.SearchAnimeAsync("frieren"));
+            () => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.Equal(AniListUnavailableException.DefaultMessage, exception.Message);
         Assert.IsType<HttpRequestException>(exception.InnerException);
@@ -102,7 +102,7 @@ public sealed class AniListServiceTransportTests
         var service = Create(handler);
 
         var exception = await Assert.ThrowsAsync<AniListUnavailableException>(
-            () => service.SearchAnimeAsync("frieren"));
+            () => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.Equal(403, exception.StatusCode);
     }
@@ -116,7 +116,7 @@ public sealed class AniListServiceTransportTests
         var service = Create(handler);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.SearchAnimeAsync("frieren"));
+            () => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.Contains("Cannot query field", exception.Message);
     }
@@ -131,7 +131,7 @@ public sealed class AniListServiceTransportTests
         var service = Create(handler);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.SearchAnimeAsync("frieren"));
+            () => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.IsNotType<AniListUnavailableException>(exception);
         Assert.Contains("was not provided", exception.Message);
@@ -146,7 +146,7 @@ public sealed class AniListServiceTransportTests
         var service = Create(handler);
 
         var exception = await Assert.ThrowsAsync<AniListUnavailableException>(
-            () => service.SearchAnimeAsync("frieren"));
+            () => service.SearchAnimeAsync("frieren", TestContext.Current.CancellationToken));
 
         Assert.Equal(503, exception.StatusCode);
         Assert.Null(exception.ServerMessage);

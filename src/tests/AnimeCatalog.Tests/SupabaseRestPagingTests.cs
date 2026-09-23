@@ -21,7 +21,7 @@ public sealed class SupabaseRestPagingTests
         var handler = new PagingHandler(totalRows: 1616);
         var service = CreateService(handler);
 
-        var rows = await service.SelectAsync<Row>("anime_relations");
+        var rows = await service.SelectAsync<Row>("anime_relations", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(1616, rows.Count);
         Assert.Equal(2, handler.RequestCount);
@@ -38,7 +38,7 @@ public sealed class SupabaseRestPagingTests
         var handler = new PagingHandler(totalRows: 1616);
         var service = CreateService(handler);
 
-        await service.SelectAsync<Row>("anime_relations");
+        await service.SelectAsync<Row>("anime_relations", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal($"limit={PageSize}", QueryValue(handler.Uris[0], "limit"));
         Assert.Null(QueryValue(handler.Uris[0], "offset"));
@@ -51,7 +51,7 @@ public sealed class SupabaseRestPagingTests
         var handler = new PagingHandler(totalRows: 5);
         var service = CreateService(handler);
 
-        await service.SelectAsync<Row>("anime_relations");
+        await service.SelectAsync<Row>("anime_relations", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("order=id.asc", QueryValue(handler.Uris[0], "order"));
     }
@@ -62,7 +62,7 @@ public sealed class SupabaseRestPagingTests
         var handler = new PagingHandler(totalRows: 5);
         var service = CreateService(handler);
 
-        await service.SelectAsync<Row>("anime_relations", order: "created_at.desc");
+        await service.SelectAsync<Row>("anime_relations", order: "created_at.desc", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("order=created_at.desc", QueryValue(handler.Uris[0], "order"));
     }
@@ -73,7 +73,7 @@ public sealed class SupabaseRestPagingTests
         var handler = new PagingHandler(totalRows: 42);
         var service = CreateService(handler);
 
-        var rows = await service.SelectAsync<Row>("franchises");
+        var rows = await service.SelectAsync<Row>("franchises", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(42, rows.Count);
         Assert.Equal(1, handler.RequestCount);
@@ -85,7 +85,7 @@ public sealed class SupabaseRestPagingTests
         var handler = new PagingHandler(totalRows: 0);
         var service = CreateService(handler);
 
-        Assert.Empty(await service.SelectAsync<Row>("franchises"));
+        Assert.Empty(await service.SelectAsync<Row>("franchises", cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(1, handler.RequestCount);
     }
 
@@ -97,7 +97,7 @@ public sealed class SupabaseRestPagingTests
         var handler = new PagingHandler(totalRows: PageSize);
         var service = CreateService(handler);
 
-        var rows = await service.SelectAsync<Row>("anime_relations");
+        var rows = await service.SelectAsync<Row>("anime_relations", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(PageSize, rows.Count);
         Assert.Equal(2, handler.RequestCount);
@@ -112,7 +112,7 @@ public sealed class SupabaseRestPagingTests
         var rows = await service.SelectAsync<Row>("anime_relations", new Dictionary<string, string>
         {
             ["limit"] = "5"
-        });
+        }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(5, rows.Count);
         Assert.Equal(1, handler.RequestCount);
@@ -127,7 +127,7 @@ public sealed class SupabaseRestPagingTests
         await service.SelectAsync<Row>("anime_relations", new Dictionary<string, string>
         {
             ["offset"] = "10"
-        });
+        }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(1, handler.RequestCount);
     }
@@ -141,7 +141,7 @@ public sealed class SupabaseRestPagingTests
         await service.SelectAsync<Row>("anime_relations", new Dictionary<string, string>
         {
             ["source_anime_id"] = "eq.480"
-        });
+        }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, handler.RequestCount);
         Assert.All(handler.Uris, uri => Assert.Contains("source_anime_id=eq.480", uri.Query));
@@ -156,7 +156,7 @@ public sealed class SupabaseRestPagingTests
         var row = await service.SelectSingleAsync<Row>("anime_entries", new Dictionary<string, string>
         {
             ["anilist_id"] = "eq.143338"
-        });
+        }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(row);
         Assert.Equal(1, handler.RequestCount);

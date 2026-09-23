@@ -34,7 +34,7 @@ public sealed class AdminAccessStateTests
     public async Task SignedInNonAdmin_GetsNoSignInPromptAndAWayOut()
     {
         await using var context = CreateContext(withStoredSession: true);
-        await context.Services.GetRequiredService<AuthService>().InitializeAsync();
+        await context.Services.GetRequiredService<AuthService>().InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         var cut = context.Render<AdminAccessState>();
 
@@ -51,7 +51,7 @@ public sealed class AdminAccessStateTests
     {
         await using var context = CreateContext(withStoredSession: true);
         var authService = context.Services.GetRequiredService<AuthService>();
-        await authService.InitializeAsync();
+        await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         var cut = context.Render<AdminAccessState>();
         cut.Find(".button-row button").Click();

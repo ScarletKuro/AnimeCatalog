@@ -25,7 +25,7 @@ public sealed class SupabaseRestServiceTests
             Microsoft.Extensions.Options.Options.Create(new SupabaseOptions { Url = "https://example.supabase.co", PublishableKey = "sb_publishable_123" }),
             new StubTokenProvider("token-abc"));
 
-        await service.SelectAsync<Dictionary<string, object>>("franchises");
+        await service.SelectAsync<Dictionary<string, object>>("franchises", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(handler.LastRequest);
         Assert.Equal("sb_publishable_123", handler.LastRequest!.Headers.GetValues("apikey").Single());
@@ -47,7 +47,7 @@ public sealed class SupabaseRestServiceTests
             Microsoft.Extensions.Options.Options.Create(new SupabaseOptions { Url = "https://example.supabase.co", PublishableKey = "sb_publishable_123" }),
             new StubTokenProvider(null));
 
-        var exception = await Assert.ThrowsAsync<PostgrestException>(() => service.SelectAsync<Dictionary<string, object>>("franchises"));
+        var exception = await Assert.ThrowsAsync<PostgrestException>(() => service.SelectAsync<Dictionary<string, object>>("franchises", cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(403, exception.StatusCode);
         Assert.Equal("42501", exception.Error.Code);
     }
@@ -74,7 +74,7 @@ public sealed class SupabaseRestServiceTests
         {
             anilist_id = 175124,
             title_romaji = "Nyaight of the Living Cat"
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.NotNull(row);
         Assert.Equal(9, row!.Id);
@@ -109,7 +109,7 @@ public sealed class SupabaseRestServiceTests
             status = "watching",
             score = (decimal?)null,
             episodes_watched = 6
-        }, "anime_entry_id");
+        }, "anime_entry_id", TestContext.Current.CancellationToken);
 
         Assert.NotNull(requestBody);
         Assert.Contains("\"score\":null", requestBody);

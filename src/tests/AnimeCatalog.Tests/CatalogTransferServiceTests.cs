@@ -190,7 +190,7 @@ public sealed class CatalogTransferServiceTests
                 ExportEntry(356, "completed"),
                 ExportEntry(1, "watching")
             ]
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Skipped);
         Assert.Equal(1, result.EntriesUpdated);
@@ -218,7 +218,7 @@ public sealed class CatalogTransferServiceTests
                 ExportEntry(356, "garbage"),
                 ExportEntry(1, "completed")
             ]
-        });
+        }, TestContext.Current.CancellationToken);
 
         var skipped = Assert.Single(result.Skipped);
         Assert.Contains("AniList 356", skipped);
@@ -241,7 +241,7 @@ public sealed class CatalogTransferServiceTests
         var result = await service.ImportAsync(new CatalogExportFile
         {
             Entries = [ExportEntry(356, "completed")]
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, result.RelationsWritten);
         Assert.DoesNotContain("anime_relations", supabase.Deletes);
@@ -256,7 +256,7 @@ public sealed class CatalogTransferServiceTests
             new FakeAdmin());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.ImportAsync(new CatalogExportFile { Version = 99 }));
+            () => service.ImportAsync(new CatalogExportFile { Version = 99 }, TestContext.Current.CancellationToken));
     }
 
     // CatalogService caches the four-table snapshot, and an import rewrites most of it. Asserted
@@ -271,7 +271,7 @@ public sealed class CatalogTransferServiceTests
         var result = await service.ImportAsync(new CatalogExportFile
         {
             Entries = [ExportEntry(356, "completed"), ExportEntry(1, "nonsense")]
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Single(result.Skipped);
         Assert.Equal(1, catalog.CacheInvalidations);
@@ -284,7 +284,7 @@ public sealed class CatalogTransferServiceTests
         var service = new CatalogTransferService(new FakeSupabase(), catalog, new FakeAdmin());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.ImportAsync(new CatalogExportFile { Version = 99 }));
+            () => service.ImportAsync(new CatalogExportFile { Version = 99 }, TestContext.Current.CancellationToken));
 
         Assert.Equal(0, catalog.CacheInvalidations);
     }
@@ -298,7 +298,7 @@ public sealed class CatalogTransferServiceTests
             new FakeAdmin(isAdmin: false));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => service.ImportAsync(new CatalogExportFile()));
+            () => service.ImportAsync(new CatalogExportFile(), TestContext.Current.CancellationToken));
     }
 
     private static AnimeEntry Anime(long id, int aniListId, string title, long? franchiseId = null) => new()

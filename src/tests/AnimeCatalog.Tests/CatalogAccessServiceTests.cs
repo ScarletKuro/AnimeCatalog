@@ -19,7 +19,7 @@ public sealed class CatalogAccessServiceTests
 
         var service = new CatalogAccessService(supabase, new FakeAdminAuthorizationService());
 
-        var enabled = await service.GetPublicCatalogEnabledAsync();
+        var enabled = await service.GetPublicCatalogEnabledAsync(TestContext.Current.CancellationToken);
 
         Assert.False(enabled);
         Assert.Equal("app_settings", supabase.LastSelectSingleTable);
@@ -36,7 +36,7 @@ public sealed class CatalogAccessServiceTests
 
         var service = new CatalogAccessService(supabase, new FakeAdminAuthorizationService());
 
-        var canRead = await service.CanCurrentUserReadCatalogAsync();
+        var canRead = await service.CanCurrentUserReadCatalogAsync(TestContext.Current.CancellationToken);
 
         Assert.False(canRead);
         Assert.Equal("can_read_catalog", supabase.LastRpcFunctionName);
@@ -56,7 +56,7 @@ public sealed class CatalogAccessServiceTests
 
         var service = new CatalogAccessService(supabase, new FakeAdminAuthorizationService());
 
-        await service.SetPublicCatalogEnabledAsync(true);
+        await service.SetPublicCatalogEnabledAsync(true, TestContext.Current.CancellationToken);
 
         Assert.Equal("app_settings", supabase.LastUpdateTable);
         Assert.Equal("eq.1", supabase.LastUpdateQuery!["id"]);
@@ -68,7 +68,7 @@ public sealed class CatalogAccessServiceTests
     {
         var service = new CatalogAccessService(new FakeSupabaseRestService(), new FakeAdminAuthorizationService(isAdmin: false));
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.GetPublicCatalogEnabledAsync());
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.GetPublicCatalogEnabledAsync(TestContext.Current.CancellationToken));
     }
 
     private sealed class FakeAdminAuthorizationService : IAdminAuthorizationService

@@ -220,7 +220,7 @@ public sealed class FranchiseGapServiceTests
             [],
             [new Franchise { Id = 15, Title = "Darker than Black", Slug = "darker-than-black" }]);
 
-        var scan = await new FranchiseGapService(graph).ScanAsync(snapshot);
+        var scan = await new FranchiseGapService(graph).ScanAsync(snapshot, cancellationToken: TestContext.Current.CancellationToken);
 
         var group = Assert.Single(scan.Groups);
         Assert.Equal("Darker than Black", group.Title);
@@ -238,10 +238,10 @@ public sealed class FranchiseGapServiceTests
         var reports = new List<int>();
         var progress = new Progress<FranchiseGapScanViewModel>(partial => reports.Add(partial.ScannedCount));
 
-        await new FranchiseGapService(graph).ScanAsync(SnapshotFor(Owned(1, CatalogStatus.Completed)), progress);
+        await new FranchiseGapService(graph).ScanAsync(SnapshotFor(Owned(1, CatalogStatus.Completed)), progress, TestContext.Current.CancellationToken);
 
         // Progress is delivered on the synchronisation context, so allow it to drain.
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         Assert.NotEmpty(reports);
     }
 
@@ -264,7 +264,7 @@ public sealed class FranchiseGapServiceTests
     {
         var graph = new FakeEnrichmentService(Anime(1, "A", score: 80));
 
-        var scan = await new FranchiseGapService(graph).ScanAsync(new RepositorySnapshot([], [], [], []));
+        var scan = await new FranchiseGapService(graph).ScanAsync(new RepositorySnapshot([], [], [], []), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(scan.Groups);
         Assert.Equal(0, scan.ScannedCount);

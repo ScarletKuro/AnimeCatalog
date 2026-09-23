@@ -23,9 +23,9 @@ public sealed class CatalogSnapshotCacheTests
     {
         var (service, rest, _, _) = Create();
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(4, afterFirst);
         Assert.Equal(afterFirst, rest.SelectCallCount);
@@ -37,9 +37,9 @@ public sealed class CatalogSnapshotCacheTests
     {
         var (service, rest, _, _) = Create();
 
-        await service.GetCatalogAsync(new() { Query = "one" });
+        await service.GetCatalogAsync(new() { Query = "one" }, TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
-        await service.GetCatalogAsync(new() { Query = "two" });
+        await service.GetCatalogAsync(new() { Query = "two" }, TestContext.Current.CancellationToken);
 
         Assert.Equal(afterFirst, rest.SelectCallCount);
     }
@@ -49,11 +49,11 @@ public sealed class CatalogSnapshotCacheTests
     {
         var (service, rest, time, _) = Create();
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         time.Advance(TimeSpan.FromSeconds(61));
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.True(rest.SelectCallCount > afterFirst);
     }
@@ -65,11 +65,11 @@ public sealed class CatalogSnapshotCacheTests
     {
         var (service, rest, _, access) = Create();
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
         access.CanRead = false;
 
-        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync());
+        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(2, access.CheckCount);
         Assert.Equal(afterFirst, rest.SelectCallCount);
@@ -81,14 +81,14 @@ public sealed class CatalogSnapshotCacheTests
     {
         var (service, rest, _, access) = Create();
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         access.CanRead = false;
-        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync());
+        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync(TestContext.Current.CancellationToken));
 
         access.CanRead = true;
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.True(rest.SelectCallCount > afterFirst);
     }
@@ -103,11 +103,11 @@ public sealed class CatalogSnapshotCacheTests
         var auth = new StubAuthStateNotifier("owner", isAdmin: true);
         var (service, rest, _, _) = Create(auth);
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         auth.SignOut();
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.True(rest.SelectCallCount > afterFirst);
     }
@@ -118,11 +118,11 @@ public sealed class CatalogSnapshotCacheTests
         var auth = new StubAuthStateNotifier();
         var (service, rest, _, _) = Create(auth);
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         auth.SignInAs("owner", isAdmin: true);
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.True(rest.SelectCallCount > afterFirst);
     }
@@ -135,11 +135,11 @@ public sealed class CatalogSnapshotCacheTests
         var auth = new StubAuthStateNotifier("owner", isAdmin: true);
         var (service, rest, _, _) = Create(auth);
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         auth.RaiseWithoutIdentityChange();
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(afterFirst, rest.SelectCallCount);
     }
@@ -153,13 +153,13 @@ public sealed class CatalogSnapshotCacheTests
         var navigation = new MovableNavigationManager("catalog");
         var (service, rest, _, _) = Create(navigation: navigation);
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         navigation.Go("calendar");
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         navigation.Go("catalog");
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(afterFirst * 3, rest.SelectCallCount);
     }
@@ -172,13 +172,13 @@ public sealed class CatalogSnapshotCacheTests
         var navigation = new MovableNavigationManager("catalog");
         var (service, rest, _, _) = Create(navigation: navigation);
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         navigation.Go("catalog?q=one");
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         navigation.Go("catalog?q=one&sort=Year&page=3");
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(afterFirst, rest.SelectCallCount);
     }
@@ -189,11 +189,11 @@ public sealed class CatalogSnapshotCacheTests
         var navigation = new MovableNavigationManager("catalog");
         var (service, rest, _, _) = Create(navigation: navigation);
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         navigation.Go("catalog#entries");
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(afterFirst, rest.SelectCallCount);
     }
@@ -203,11 +203,11 @@ public sealed class CatalogSnapshotCacheTests
     {
         var (service, rest, _, _) = Create();
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         service.InvalidateCachedReads();
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.True(rest.SelectCallCount > afterFirst);
     }
@@ -219,9 +219,9 @@ public sealed class CatalogSnapshotCacheTests
     {
         var (service, rest, _, _) = Create();
 
-        await service.GetSnapshotAsync();
+        await service.GetSnapshotAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.True(overlay.IsDecorating);
         Assert.Equal(afterFirst, rest.SelectCallCount);

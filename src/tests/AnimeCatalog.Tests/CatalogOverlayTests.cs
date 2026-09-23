@@ -29,7 +29,7 @@ public sealed class CatalogOverlayTests
                 new CatalogEntryRow { Id = 1, AnimeEntryId = 7, Status = "watching", EpisodesWatched = 500, Score = 9m }
             ]);
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.True(overlay.IsDecorating);
         var item = Assert.Single(overlay.ByAniListId).Value;
@@ -49,7 +49,7 @@ public sealed class CatalogOverlayTests
             animeRows: [new AnimeEntryRow { Id = 1, AniListId = 21, TitleRomaji = "A", DisplayOrder = 0 }],
             catalogRows: [new CatalogEntryRow { Id = 1, AnimeEntryId = 1, Status = "completed", EpisodesWatched = 12 }]);
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(overlay.Find(21));
         Assert.Null(overlay.Find(999));
@@ -72,7 +72,7 @@ public sealed class CatalogOverlayTests
                 new CatalogEntryRow { Id = 2, AnimeEntryId = 2, Status = "planned", EpisodesWatched = 0 }
             ]);
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal([21], overlay.ByAniListId.Keys.Order().ToArray());
     }
@@ -90,7 +90,7 @@ public sealed class CatalogOverlayTests
             ],
             catalogRows: [new CatalogEntryRow { Id = 1, AnimeEntryId = 1, Status = "watching", EpisodesWatched = 3 }]);
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(overlay.ByAniListId);
         Assert.Equal(1, overlay.Find(21)!.AnimeEntryId);
@@ -103,7 +103,7 @@ public sealed class CatalogOverlayTests
             animeRows: [new AnimeEntryRow { Id = 1, AniListId = 21, TitleRomaji = "A", Episodes = 12, DisplayOrder = 0 }],
             catalogRows: []);
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         var item = overlay.Find(21);
         Assert.NotNull(item);
@@ -119,7 +119,7 @@ public sealed class CatalogOverlayTests
             animeRows: [new AnimeEntryRow { Id = 1, AniListId = 21, TitleRomaji = "A", Episodes = null, DisplayOrder = 0 }],
             catalogRows: [new CatalogEntryRow { Id = 1, AnimeEntryId = 1, Status = "watching", EpisodesWatched = 4 }]);
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(overlay.Find(21)!.ProgressPercent);
     }
@@ -131,7 +131,7 @@ public sealed class CatalogOverlayTests
             animeRows: [new AnimeEntryRow { Id = 1, AniListId = 21, TitleRomaji = "A", Episodes = 12, DisplayOrder = 0 }],
             catalogRows: [new CatalogEntryRow { Id = 1, AnimeEntryId = 1, Status = "completed", EpisodesWatched = 25 }]);
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(100, overlay.Find(21)!.ProgressPercent);
     }
@@ -142,7 +142,7 @@ public sealed class CatalogOverlayTests
         var rest = new CountingSupabaseRestService([], [], isConfigured: false);
         var service = new CatalogService(rest, new FranchiseService(), new FakeAccess());
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(CatalogAccessState.NotConfigured, overlay.State);
         Assert.False(overlay.IsDecorating);
@@ -163,7 +163,7 @@ public sealed class CatalogOverlayTests
             new FranchiseService(),
             new FakeAccess(canReadCatalog: false));
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(CatalogAccessState.Private, overlay.State);
         Assert.False(overlay.IsDecorating);
@@ -179,7 +179,7 @@ public sealed class CatalogOverlayTests
             new FranchiseService(),
             new FakeAccess());
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(CatalogAccessState.Error, overlay.State);
         Assert.Empty(overlay.ByAniListId);
@@ -194,7 +194,7 @@ public sealed class CatalogOverlayTests
             new FranchiseService(),
             new FakeAccess());
 
-        var overlay = await service.GetCatalogOverlayAsync();
+        var overlay = await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(CatalogAccessState.Private, overlay.State);
     }
@@ -209,10 +209,10 @@ public sealed class CatalogOverlayTests
         var time = new FixedTimeProvider(new DateTimeOffset(2026, 8, 22, 12, 0, 0, TimeSpan.Zero));
         var service = new CatalogService(rest, new FranchiseService(), new FakeAccess(), time);
 
-        await service.GetCatalogOverlayAsync();
+        await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
-        await service.GetCatalogOverlayAsync();
+        await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(afterFirst, rest.SelectCallCount);
     }
@@ -227,11 +227,11 @@ public sealed class CatalogOverlayTests
         var time = new FixedTimeProvider(new DateTimeOffset(2026, 8, 22, 12, 0, 0, TimeSpan.Zero));
         var service = new CatalogService(rest, new FranchiseService(), new FakeAccess(), time);
 
-        await service.GetCatalogOverlayAsync();
+        await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         time.Advance(TimeSpan.FromMinutes(6));
-        await service.GetCatalogOverlayAsync();
+        await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.True(rest.SelectCallCount > afterFirst);
     }
@@ -246,11 +246,11 @@ public sealed class CatalogOverlayTests
         var time = new FixedTimeProvider(new DateTimeOffset(2026, 8, 22, 12, 0, 0, TimeSpan.Zero));
         var service = new CatalogService(rest, new FranchiseService(), new FakeAccess(), time);
 
-        await service.GetCatalogOverlayAsync();
+        await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
         var afterFirst = rest.SelectCallCount;
 
         service.InvalidateCachedReads();
-        await service.GetCatalogOverlayAsync();
+        await service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken);
 
         Assert.True(rest.SelectCallCount > afterFirst);
     }
@@ -263,7 +263,7 @@ public sealed class CatalogOverlayTests
         var rest = new ThrowingSupabaseRestService(new OperationCanceledException());
         var service = new CatalogService(rest, new FranchiseService(), new FakeAccess());
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.GetCatalogOverlayAsync());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.GetCatalogOverlayAsync(TestContext.Current.CancellationToken));
 
         // Nothing was cached, so a working read still gets through.
         var working = new CatalogService(
@@ -273,7 +273,7 @@ public sealed class CatalogOverlayTests
             new FranchiseService(),
             new FakeAccess());
 
-        Assert.True((await working.GetCatalogOverlayAsync()).IsDecorating);
+        Assert.True((await working.GetCatalogOverlayAsync(TestContext.Current.CancellationToken)).IsDecorating);
     }
 
     private static CatalogService Create(

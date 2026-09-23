@@ -12,8 +12,8 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
-        var first = await service.GetAsync(20);
-        var second = await service.GetAsync(20);
+        var first = await service.GetAsync(20, TestContext.Current.CancellationToken);
+        var second = await service.GetAsync(20, TestContext.Current.CancellationToken);
 
         Assert.NotNull(first);
         Assert.Same(first, second);
@@ -27,8 +27,8 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(ids => ids.Select(Media), gate.Task);
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
-        var first = service.GetAsync(20);
-        var second = service.GetAsync(20);
+        var first = service.GetAsync(20, TestContext.Current.CancellationToken);
+        var second = service.GetAsync(20, TestContext.Current.CancellationToken);
 
         gate.SetResult();
         var results = await Task.WhenAll(first, second);
@@ -44,7 +44,7 @@ public sealed class AniListEnrichmentServiceTests
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
         var ids = Enumerable.Range(1, 120).ToList();
-        var results = await service.GetManyAsync(ids);
+        var results = await service.GetManyAsync(ids, TestContext.Current.CancellationToken);
 
         Assert.Equal(120, results.Count);
         Assert.Equal(3, aniList.CallCount);
@@ -58,8 +58,8 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
-        await service.GetManyAsync([1, 2, 3]);
-        await service.GetManyAsync([2, 3, 4]);
+        await service.GetManyAsync([1, 2, 3], TestContext.Current.CancellationToken);
+        await service.GetManyAsync([2, 3, 4], TestContext.Current.CancellationToken);
 
         Assert.Equal(2, aniList.CallCount);
         Assert.Equal([4], aniList.RequestedBatches[1]);
@@ -71,7 +71,7 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
-        var results = await service.GetManyAsync([7, 7, 7]);
+        var results = await service.GetManyAsync([7, 7, 7], TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal([7], aniList.RequestedBatches[0]);
@@ -84,7 +84,7 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(ids => ids.OrderByDescending(id => id).Select(Media));
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
-        var results = await service.GetManyAsync([16498, 21, 154587]);
+        var results = await service.GetManyAsync([16498, 21, 154587], TestContext.Current.CancellationToken);
 
         Assert.Equal(21, results[21].Id);
         Assert.Equal(16498, results[16498].Id);
@@ -97,7 +97,7 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(_ => throw new HttpRequestException("AniList is down"));
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
-        Assert.Null(await service.GetAsync(20));
+        Assert.Null(await service.GetAsync(20, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -111,14 +111,14 @@ public sealed class AniListEnrichmentServiceTests
 
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(time, TimeSpan.Zero), time);
 
-        Assert.Null(await service.GetAsync(20));
-        Assert.Null(await service.GetAsync(20));
+        Assert.Null(await service.GetAsync(20, TestContext.Current.CancellationToken));
+        Assert.Null(await service.GetAsync(20, TestContext.Current.CancellationToken));
         Assert.Equal(1, aniList.CallCount);
 
         shouldFail = false;
         time.Advance(TimeSpan.FromMinutes(3));
 
-        Assert.NotNull(await service.GetAsync(20));
+        Assert.NotNull(await service.GetAsync(20, TestContext.Current.CancellationToken));
         Assert.Equal(2, aniList.CallCount);
     }
 
@@ -130,9 +130,9 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(_ => []);
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(time, TimeSpan.Zero), time);
 
-        Assert.Null(await service.GetAsync(999));
+        Assert.Null(await service.GetAsync(999, TestContext.Current.CancellationToken));
         time.Advance(TimeSpan.FromMinutes(3));
-        Assert.Null(await service.GetAsync(999));
+        Assert.Null(await service.GetAsync(999, TestContext.Current.CancellationToken));
 
         Assert.Equal(1, aniList.CallCount);
     }
@@ -143,7 +143,7 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.Zero));
 
-        Assert.Empty(await service.GetManyAsync([]));
+        Assert.Empty(await service.GetManyAsync([], TestContext.Current.CancellationToken));
         Assert.Equal(0, aniList.CallCount);
     }
 
@@ -159,7 +159,7 @@ public sealed class AniListEnrichmentServiceTests
         Assert.Null(await service.GetAsync(20, cts.Token));
 
         // The cancelled attempt must not be remembered as a failure.
-        Assert.NotNull(await service.GetAsync(20));
+        Assert.NotNull(await service.GetAsync(20, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class AniListEnrichmentServiceTests
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.FromMilliseconds(120)));
 
         var started = DateTimeOffset.UtcNow;
-        await service.GetManyAsync(Enumerable.Range(1, 120).ToList());
+        await service.GetManyAsync(Enumerable.Range(1, 120).ToList(), TestContext.Current.CancellationToken);
         var elapsed = DateTimeOffset.UtcNow - started;
 
         Assert.Equal(3, aniList.CallCount);
@@ -185,11 +185,11 @@ public sealed class AniListEnrichmentServiceTests
         var aniList = new RecordingAniListService(ids => ids.Select(Media));
         var service = new AniListEnrichmentService(aniList, new AniListRequestPacer(null, TimeSpan.FromSeconds(30)));
 
-        await service.GetManyAsync([1]);
+        await service.GetManyAsync([1], TestContext.Current.CancellationToken);
 
         // Already cached, so this must not sit behind the spacing delay.
         var started = DateTimeOffset.UtcNow;
-        await service.GetManyAsync([1]);
+        await service.GetManyAsync([1], TestContext.Current.CancellationToken);
 
         Assert.True(DateTimeOffset.UtcNow - started < TimeSpan.FromSeconds(1));
         Assert.Equal(1, aniList.CallCount);

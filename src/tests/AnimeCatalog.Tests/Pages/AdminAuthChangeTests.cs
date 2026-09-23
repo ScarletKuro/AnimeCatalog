@@ -27,12 +27,12 @@ public sealed class AdminAuthChangeTests
     {
         await using var context = CreateContext(out _, holdChecks: false);
         var authService = context.Services.GetRequiredService<AuthService>();
-        await authService.InitializeAsync();
+        await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         var cut = context.Render<Dashboard>();
         await cut.WaitForAssertionAsync(() => Assert.Contains("Catalog visibility", cut.Markup));
 
-        await authService.LogoutAsync();
+        await authService.LogoutAsync(Xunit.TestContext.Current.CancellationToken);
 
         await cut.WaitForAssertionAsync(() =>
         {
@@ -50,12 +50,12 @@ public sealed class AdminAuthChangeTests
         // The access check is parked so the scan is genuinely in flight when the session goes away.
         await using var context = CreateContext(out var access, holdChecks: true);
         var authService = context.Services.GetRequiredService<AuthService>();
-        await authService.InitializeAsync();
+        await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         var cut = context.Render<WatchNext>();
         access.WaitUntilACheckIsInFlight();
 
-        await authService.LogoutAsync();
+        await authService.LogoutAsync(Xunit.TestContext.Current.CancellationToken);
 
         cut.WaitForAssertion(() => Assert.Contains("Authentication required", cut.Markup));
         Assert.True(access.HeldCheckWasCancelled);

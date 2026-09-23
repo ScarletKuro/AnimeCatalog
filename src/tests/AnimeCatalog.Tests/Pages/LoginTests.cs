@@ -50,7 +50,7 @@ public sealed class LoginTests
         await using var context = CreateContext(withStoredSession: true);
 
         // Login does not subscribe to StateChanged, so the session has to exist before the render.
-        await context.Services.GetRequiredService<AuthService>().InitializeAsync();
+        await context.Services.GetRequiredService<AuthService>().InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         var cut = context.Render<Login>();
 

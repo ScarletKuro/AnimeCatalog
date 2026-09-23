@@ -34,7 +34,7 @@ public sealed class NavMenuTests
         using var context = CreateContext(isAdmin: true, out var authService);
 
         var cut = context.Render<NavMenu>();
-        await authService.InitializeAsync();
+        await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         cut.WaitForAssertion(() =>
         {
@@ -51,7 +51,7 @@ public sealed class NavMenuTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("admin/add");
 
         var cut = context.Render<NavMenu>();
-        await authService.InitializeAsync();
+        await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Prefix matching is the NavLink default, so without Match="NavLinkMatch.All" on /admin both
         // admin links would render as active at the same time.
@@ -99,7 +99,7 @@ public sealed class NavMenuTests
         using var context = CreateContext(isAdmin: true, out var authService);
 
         var cut = context.Render<NavMenu>();
-        await authService.InitializeAsync();
+        await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
         cut.WaitForAssertion(() => Assert.True(authService.IsAdmin));
         cut.Find("button.nav-toggle").Click();

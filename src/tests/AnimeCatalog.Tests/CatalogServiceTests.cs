@@ -20,7 +20,7 @@ public sealed class CatalogServiceTests
             new FranchiseService(),
             new FakeCatalogAccessService(publicCatalogEnabled: false));
 
-        var summary = await service.GetAdminDashboardAsync();
+        var summary = await service.GetAdminDashboardAsync(TestContext.Current.CancellationToken);
 
         Assert.False(summary.PublicCatalogEnabled);
         Assert.Equal(1, summary.AnimeEntryCount);
@@ -35,7 +35,7 @@ public sealed class CatalogServiceTests
             new FranchiseService(),
             new FakeCatalogAccessService());
 
-        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync());
+        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class CatalogServiceTests
             new FranchiseService(),
             new FakeCatalogAccessService(publicCatalogEnabled: false, canReadCatalog: false));
 
-        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync());
+        await Assert.ThrowsAsync<CatalogAccessDeniedException>(() => service.GetSnapshotAsync(TestContext.Current.CancellationToken));
     }
 
     private sealed class FakeCatalogAccessService : ICatalogAccessService

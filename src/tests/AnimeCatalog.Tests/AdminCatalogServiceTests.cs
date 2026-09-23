@@ -30,7 +30,7 @@ public sealed class AdminCatalogServiceTests
             TitleNative = "キルアオ",
             Status = CatalogStatus.Planned,
             EpisodesWatched = 0
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(101, id);
         Assert.Contains(supabase.InsertCalls, call => call.Table == "anime_entries");
@@ -63,7 +63,7 @@ public sealed class AdminCatalogServiceTests
             TitleNative = "キルアオ",
             Status = CatalogStatus.Planned,
             EpisodesWatched = 0
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(3, id);
         Assert.DoesNotContain(supabase.InsertCalls, call => call.Table == "anime_entries");
@@ -94,7 +94,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([relatedAnime], [], [], [franchise]),
             aniListMedia: CreateMedia(198113, "Code Geass: Lelouch of the Rebellion", relationAniListIds: [1575]));
 
-        var draft = await service.CreateDraftFromAniListAsync(198113);
+        var draft = await service.CreateDraftFromAniListAsync(198113, TestContext.Current.CancellationToken);
 
         Assert.Equal(FranchiseAssignmentMode.Existing, draft.FranchiseAssignmentMode);
         Assert.Equal(franchiseId, draft.FranchiseId);
@@ -110,7 +110,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113, "Code Geass: Lelouch of the Rebellion"));
 
-        var draft = await service.CreateDraftFromAniListAsync(198113);
+        var draft = await service.CreateDraftFromAniListAsync(198113, TestContext.Current.CancellationToken);
 
         Assert.Equal(FranchiseAssignmentMode.None, draft.FranchiseAssignmentMode);
         Assert.Null(draft.SuggestedFranchiseTitle);
@@ -168,7 +168,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([soulEater, fireForceSeason3], [], [], [soulEaterFranchise, fireForceFranchise]),
             aniListMedia: media);
 
-        var draft = await service.CreateDraftFromAniListAsync(179062);
+        var draft = await service.CreateDraftFromAniListAsync(179062, TestContext.Current.CancellationToken);
 
         Assert.Equal(FranchiseAssignmentMode.Existing, draft.FranchiseAssignmentMode);
         Assert.Equal(fireForceFranchiseId, draft.FranchiseId);
@@ -184,7 +184,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113, episodes: 24));
 
-        var draft = await service.CreateDraftFromAniListAsync(198113);
+        var draft = await service.CreateDraftFromAniListAsync(198113, TestContext.Current.CancellationToken);
 
         Assert.Equal(CatalogStatus.Completed, draft.Status);
         Assert.Equal(24, draft.EpisodesWatched);
@@ -202,7 +202,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        var draft = await service.CreateDraftFromAniListAsync(198113);
+        var draft = await service.CreateDraftFromAniListAsync(198113, TestContext.Current.CancellationToken);
 
         Assert.Equal(CatalogStatus.Completed, draft.Status);
         Assert.Null(draft.Episodes);
@@ -218,7 +218,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6, null, null);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6, null, null, TestContext.Current.CancellationToken);
 
         var upsert = Assert.Single(supabase.UpsertCalls);
         Assert.Equal("catalog_entries", upsert.Table);
@@ -245,7 +245,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Completed, 8.5m, 16, null, null);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Completed, 8.5m, 16, null, null, TestContext.Current.CancellationToken);
 
         Assert.Null(ReadDate(Assert.Single(supabase.UpsertCalls).Payload, "completed_at"));
     }
@@ -260,7 +260,7 @@ public sealed class AdminCatalogServiceTests
             aniListMedia: CreateMedia(198113));
 
         var stored = new DateOnly(2024, 3, 4);
-        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Completed, 8.5m, 16, null, stored);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Completed, 8.5m, 16, null, stored, TestContext.Current.CancellationToken);
 
         Assert.Equal(stored, ReadDate(Assert.Single(supabase.UpsertCalls).Payload, "completed_at"));
     }
@@ -274,7 +274,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, null, 15, new DateOnly(2024, 3, 4), Today);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, null, 15, new DateOnly(2024, 3, 4), Today, TestContext.Current.CancellationToken);
 
         var payload = Assert.Single(supabase.UpsertCalls).Payload;
         Assert.Null(ReadDate(payload, "completed_at"));
@@ -301,7 +301,7 @@ public sealed class AdminCatalogServiceTests
             Status = CatalogStatus.Watching,
             EpisodesWatched = 5,
             CompletedAt = new DateOnly(2024, 3, 4)
-        });
+        }, TestContext.Current.CancellationToken);
 
         var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
         Assert.Null(ReadDate(upsert.Payload, "completed_at"));
@@ -324,7 +324,7 @@ public sealed class AdminCatalogServiceTests
             TitleRomaji = "Kill Ao",
             Status = CatalogStatus.Completed,
             EpisodesWatched = 16
-        });
+        }, TestContext.Current.CancellationToken);
 
         var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
         Assert.Null(ReadDate(upsert.Payload, "completed_at"));
@@ -356,7 +356,7 @@ public sealed class AdminCatalogServiceTests
             EpisodesWatched = 16,
             FranchiseAssignmentMode = FranchiseAssignmentMode.CreateNew,
             NewFranchiseTitle = "Kill Blue"
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Contains(supabase.InsertCalls, call => call.Table == "franchises");
         var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
@@ -383,7 +383,7 @@ public sealed class AdminCatalogServiceTests
             Status = CatalogStatus.Completed,
             EpisodesWatched = 16,
             CompletedAt = typed
-        });
+        }, TestContext.Current.CancellationToken);
 
         var upsert = Assert.Single(supabase.UpsertCalls, call => call.Table == "catalog_entries");
         Assert.Equal(typed, ReadDate(upsert.Payload, "completed_at"));
@@ -402,10 +402,10 @@ public sealed class AdminCatalogServiceTests
             aniListMedia: CreateMedia(198113));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 11m, 6, null, null));
+            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 11m, 6, null, null, TestContext.Current.CancellationToken));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, null, -1, null, null));
+            () => service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, null, -1, null, null, TestContext.Current.CancellationToken));
 
         Assert.Empty(supabase.UpsertCalls);
     }
@@ -423,7 +423,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([existing], [], [], [franchise]),
             aniListMedia: CreateMedia(143338));
 
-        var inspection = await service.InspectAniListIdAsync(143338);
+        var inspection = await service.InspectAniListIdAsync(143338, TestContext.Current.CancellationToken);
 
         Assert.True(inspection.IsAlreadyInCatalog);
         Assert.Equal(480, inspection.ExistingEntry!.Id);
@@ -440,7 +440,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113, episodes: 12));
 
-        var inspection = await service.InspectAniListIdAsync(198113);
+        var inspection = await service.InspectAniListIdAsync(198113, TestContext.Current.CancellationToken);
 
         Assert.False(inspection.IsAlreadyInCatalog);
         Assert.Null(inspection.ExistingEntry);
@@ -468,7 +468,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([sequelInCatalog], [], [], []),
             aniListMedia: media);
 
-        var inspection = await service.InspectAniListIdAsync(143338);
+        var inspection = await service.InspectAniListIdAsync(143338, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, inspection.Relations.Count);
         Assert.True(inspection.Relations.Single(r => r.AniListId == 555).IsInCatalog);
@@ -493,7 +493,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: media);
 
-        var inspection = await service.InspectAniListIdAsync(143338);
+        var inspection = await service.InspectAniListIdAsync(143338, TestContext.Current.CancellationToken);
 
         Assert.Empty(inspection.Relations);
     }
@@ -523,7 +523,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        var map = await service.GetCatalogedAniListIdsAsync();
+        var map = await service.GetCatalogedAniListIdsAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, map.Count);
         Assert.Equal(7, map[198113]);
@@ -539,7 +539,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        await service.GetCatalogedAniListIdsAsync();
+        await service.GetCatalogedAniListIdsAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal([("anime_entries", "id,anilist_id")], supabase.SelectCalls);
     }
@@ -556,7 +556,7 @@ public sealed class AdminCatalogServiceTests
             snapshot: new RepositorySnapshot([], [], [], []),
             aniListMedia: CreateMedia(198113));
 
-        var map = await service.GetCatalogedAniListIdsAsync();
+        var map = await service.GetCatalogedAniListIdsAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(7, Assert.Single(map).Value);
     }
@@ -570,7 +570,7 @@ public sealed class AdminCatalogServiceTests
         var catalog = new FakeCatalogService(new RepositorySnapshot([], [], [], []));
         var service = CreateService(new FakeSupabaseRestService(), catalog, CreateMedia(198113));
 
-        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6, null, null);
+        await service.UpdateCatalogEntryAsync(101, CatalogStatus.Watching, 8.5m, 6, null, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, catalog.CacheInvalidations);
     }
@@ -581,7 +581,7 @@ public sealed class AdminCatalogServiceTests
         var catalog = new FakeCatalogService(new RepositorySnapshot([], [], [], []));
         var service = CreateService(new FakeSupabaseRestService(), catalog, CreateMedia(198113));
 
-        await service.DeleteAsync(101);
+        await service.DeleteAsync(101, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, catalog.CacheInvalidations);
     }
@@ -600,7 +600,7 @@ public sealed class AdminCatalogServiceTests
             AniListId = 198113,
             TitleRomaji = "Kill Ao",
             Status = CatalogStatus.Planned
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, catalog.CacheInvalidations);
     }
@@ -618,7 +618,7 @@ public sealed class AdminCatalogServiceTests
             // No title, so validation refuses the model before anything is written.
             AniListId = 198113,
             Status = CatalogStatus.Watching
-        }));
+        }, TestContext.Current.CancellationToken));
 
         Assert.Equal(0, catalog.CacheInvalidations);
     }
