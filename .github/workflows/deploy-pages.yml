@@ -26,15 +26,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
@@ -52,9 +52,30 @@ jobs:
           --coverage-output-format cobertura
           --results-directory TestResults
 
+      - name: Collect coverage reports
+        if: always()
+        run: |
+          mkdir -p coverage
+          i=0
+          for f in TestResults/*.cobertura.xml; do
+            [ -e "$f" ] || continue
+            i=$((i + 1))
+            cp "$f" "coverage/coverage-$i.cobertura.xml"
+          done
+          test "$i" -gt 0
+          ls -l coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          directory: ./coverage
+          fail_ci_if_error: true
+          flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: TestResults/**
@@ -66,15 +87,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}

@@ -1,5 +1,7 @@
 # Anime Catalog
 
+[![codecov](https://codecov.io/github/ScarletKuro/AnimeCatalog/graph/badge.svg?token=RBN27WH6PP)](https://codecov.io/github/ScarletKuro/AnimeCatalog)
+
 A personal anime watch list: track what you have **watched**, what you are
 **watching**, what is **planned**, plus what you put **on hold** or **dropped**.
 Each entry keeps its own progress — episodes watched, a 1–10 score, start and
