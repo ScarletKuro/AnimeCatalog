@@ -48,8 +48,8 @@ jobs:
           dotnet test ${{ env.TEST_PROJECT }}
           -c Release
           --no-restore
-          --logger "trx;LogFileName=test-results.trx"
-          --collect:"XPlat Code Coverage"
+          --coverage
+          --coverage-output-format cobertura
           --results-directory TestResults
 
       - name: Upload test results
