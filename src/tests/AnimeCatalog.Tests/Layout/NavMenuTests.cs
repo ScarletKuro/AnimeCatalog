@@ -31,12 +31,12 @@ public sealed class NavMenuTests
     [Fact]
     public async Task Admin_GetsTheAddShortcutInTheHeader()
     {
-        using var context = CreateContext(isAdmin: true, out var authService);
+        await using var context = CreateContext(isAdmin: true, out var authService);
 
         var cut = context.Render<NavMenu>();
         await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             var addLink = cut.Find("a.site-nav__link--action");
             Assert.Equal("+ Add", addLink.TextContent);
@@ -47,7 +47,7 @@ public sealed class NavMenuTests
     [Fact]
     public async Task AdminLink_DoesNotClaimTheActiveStateOfTheAddPage()
     {
-        using var context = CreateContext(isAdmin: true, out var authService);
+        await using var context = CreateContext(isAdmin: true, out var authService);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("admin/add");
 
         var cut = context.Render<NavMenu>();
@@ -55,7 +55,7 @@ public sealed class NavMenuTests
 
         // Prefix matching is the NavLink default, so without Match="NavLinkMatch.All" on /admin both
         // admin links would render as active at the same time.
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             var active = Assert.Single(cut.FindAll("a.active"));
             Assert.Contains("site-nav__link--action", active.ClassList);
@@ -96,13 +96,13 @@ public sealed class NavMenuTests
     [Fact]
     public async Task Admin_GetsEveryAdminLinkInTheDrawer()
     {
-        using var context = CreateContext(isAdmin: true, out var authService);
+        await using var context = CreateContext(isAdmin: true, out var authService);
 
         var cut = context.Render<NavMenu>();
         await authService.InitializeAsync(Xunit.TestContext.Current.CancellationToken);
 
-        cut.WaitForAssertion(() => Assert.True(authService.IsAdmin));
-        cut.Find("button.nav-toggle").Click();
+        await cut.WaitForAssertionAsync(() => Assert.True(authService.IsAdmin));
+        await cut.Find("button.nav-toggle").ClickAsync();
 
         var links = cut.FindAll(".nav-drawer__nav a");
         Assert.Equal(

@@ -155,7 +155,7 @@ public sealed class FranchiseCardTests
         Assert.Equal("1 entry", ToggleLabel(single));
     }
 
-    private static string ToggleLabel(Bunit.IRenderedComponent<FranchiseCard> cut) =>
+    private static string ToggleLabel(IRenderedComponent<FranchiseCard> cut) =>
         cut.Find(".franchise-card__toggle span").TextContent.Trim();
 
     [Fact]

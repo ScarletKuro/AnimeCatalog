@@ -499,7 +499,7 @@ public sealed class AiringCalendarTests
         public Task<AdminDashboardViewModel> GetAdminDashboardAsync(CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
-        public Task<IReadOnlyList<AnimeCatalog.Models.Franchise>> GetFranchisesAsync(CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<Models.Franchise>> GetFranchisesAsync(CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         public Task<AnimeEditorModel?> GetEditorModelAsync(long id, CancellationToken cancellationToken = default)

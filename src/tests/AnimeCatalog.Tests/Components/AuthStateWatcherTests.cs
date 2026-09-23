@@ -76,7 +76,7 @@ public sealed class AuthStateWatcherTests
     {
         // The subscription outlives the component otherwise: AuthService is app-lifetime in
         // WebAssembly, so a missed unsubscribe leaks every page the visitor ever opened.
-        using var context = CreateContext(new StubAuthStateNotifier("owner", isAdmin: true), out var notifier);
+        await using var context = CreateContext(new StubAuthStateNotifier("owner", isAdmin: true), out var notifier);
         var calls = 0;
 
         context.Render<AuthStateWatcher>(parameters => parameters

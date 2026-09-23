@@ -44,9 +44,9 @@ public sealed class CatalogVisibilityPanelTests
 
         var cut = context.Render<CatalogVisibilityPanel>(parameters => parameters.Add(p => p.Enabled, false));
 
-        cut.Find(".visibility-switch").Click();
+        await cut.Find(".visibility-switch").ClickAsync();
 
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".confirm-dialog")));
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".confirm-dialog")));
         Assert.Empty(access.Writes);
     }
 
@@ -57,12 +57,12 @@ public sealed class CatalogVisibilityPanelTests
 
         var cut = context.Render<CatalogVisibilityPanel>(parameters => parameters.Add(p => p.Enabled, false));
 
-        cut.Find(".visibility-switch").Click();
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".confirm-dialog")));
+        await cut.Find(".visibility-switch").ClickAsync();
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".confirm-dialog")));
 
-        cut.Find(".confirm-dialog .button--ghost").Click();
+        await cut.Find(".confirm-dialog .button--ghost").ClickAsync();
 
-        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".confirm-dialog")));
+        await cut.WaitForAssertionAsync(() => Assert.Empty(cut.FindAll(".confirm-dialog")));
         Assert.Empty(access.Writes);
     }
 
@@ -74,14 +74,14 @@ public sealed class CatalogVisibilityPanelTests
         var changes = new List<bool>();
         var cut = context.Render<CatalogVisibilityPanel>(parameters => parameters
             .Add(p => p.Enabled, false)
-            .Add(p => p.EnabledChanged, enabled => changes.Add(enabled)));
+            .Add(p => p.EnabledChanged, changes.Add));
 
-        cut.Find(".visibility-switch").Click();
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".confirm-dialog")));
+        await cut.Find(".visibility-switch").ClickAsync();
+        await cut.WaitForAssertionAsync(() => Assert.Single(cut.FindAll(".confirm-dialog")));
 
-        cut.Find(".confirm-dialog .button--danger").Click();
+        await cut.Find(".confirm-dialog .button--danger").ClickAsync();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Empty(cut.FindAll(".confirm-dialog"));
             Assert.Equal<bool>([true], access.Writes);
@@ -98,11 +98,11 @@ public sealed class CatalogVisibilityPanelTests
         var changes = new List<bool>();
         var cut = context.Render<CatalogVisibilityPanel>(parameters => parameters
             .Add(p => p.Enabled, true)
-            .Add(p => p.EnabledChanged, enabled => changes.Add(enabled)));
+            .Add(p => p.EnabledChanged, changes.Add));
 
-        cut.Find(".visibility-switch").Click();
+        await cut.Find(".visibility-switch").ClickAsync();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Empty(cut.FindAll(".confirm-dialog"));
             Assert.Equal<bool>([false], access.Writes);
@@ -120,11 +120,11 @@ public sealed class CatalogVisibilityPanelTests
         var changes = new List<bool>();
         var cut = context.Render<CatalogVisibilityPanel>(parameters => parameters
             .Add(p => p.Enabled, true)
-            .Add(p => p.EnabledChanged, enabled => changes.Add(enabled)));
+            .Add(p => p.EnabledChanged, changes.Add));
 
-        cut.Find(".visibility-switch").Click();
+        await cut.Find(".visibility-switch").ClickAsync();
 
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             var feedback = cut.Find(".action-feedback");
             Assert.Contains("action-feedback--error", feedback.ClassList);
@@ -144,11 +144,11 @@ public sealed class CatalogVisibilityPanelTests
 
         module.VerifyNotInvoke("showModalDialog");
 
-        cut.Find(".visibility-switch").Click();
+        await cut.Find(".visibility-switch").ClickAsync();
 
         // showModal() is what puts the dialog in the top layer; a plain fixed-position div sat at
         // z-index: auto and lost to any .panel later in the DOM.
-        cut.WaitForAssertion(() =>
+        await cut.WaitForAssertionAsync(() =>
         {
             Assert.Equal("dialog", cut.Find(".confirm-dialog").TagName.ToLowerInvariant());
             module.VerifyInvoke("showModalDialog");

@@ -23,7 +23,7 @@ public sealed class EpisodePickerTests
         var options = cut.FindAll(".episode-picker__option");
         Assert.Equal(13, options.Count);
 
-        options[9].Click();
+        await options[9].ClickAsync();
         Assert.Equal(9, selected);
     }
 
@@ -38,7 +38,7 @@ public sealed class EpisodePickerTests
             .Add(p => p.Max, 12)
             .Add(p => p.ValueChanged, value => selected = value));
 
-        cut.FindAll(".episode-picker__option")[0].Click();
+        await cut.FindAll(".episode-picker__option")[0].ClickAsync();
 
         Assert.Equal(0, selected);
     }
@@ -89,7 +89,7 @@ public sealed class EpisodePickerTests
         var options = cut.FindAll(".episode-picker__option");
         Assert.Equal("12", options[^1].TextContent.Trim());
 
-        options[^1].Click();
+        await options[^1].ClickAsync();
 
         Assert.Equal(12, selected);
     }
@@ -188,7 +188,7 @@ public sealed class EpisodePickerTests
         Assert.Empty(cut.FindAll(".episode-picker__options"));
 
         var input = cut.Find("input[type=number]");
-        input.Change("9");
+        await input.ChangeAsync("9");
 
         Assert.Equal(9, selected);
     }
@@ -221,7 +221,7 @@ public sealed class EpisodePickerTests
             .Add(p => p.Max, 12)
             .Add(p => p.ValueChanged, value => selected = value));
 
-        cut.Find(".episode-picker__options").KeyDown(key);
+        await cut.Find(".episode-picker__options").KeyDownAsync(key);
 
         Assert.Equal(expected, selected);
     }
@@ -237,7 +237,7 @@ public sealed class EpisodePickerTests
             .Add(p => p.Max, 12)
             .Add(p => p.ValueChanged, value => selected = value));
 
-        atStart.Find(".episode-picker__options").KeyDown("ArrowLeft");
+        await atStart.Find(".episode-picker__options").KeyDownAsync("ArrowLeft");
         Assert.Equal(-1, selected);
 
         var atEnd = context.Render<EpisodePicker>(parameters => parameters
@@ -245,7 +245,7 @@ public sealed class EpisodePickerTests
             .Add(p => p.Max, 12)
             .Add(p => p.ValueChanged, value => selected = value));
 
-        atEnd.Find(".episode-picker__options").KeyDown("ArrowRight");
+        await atEnd.Find(".episode-picker__options").KeyDownAsync("ArrowRight");
         Assert.Equal(-1, selected);
     }
 

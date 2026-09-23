@@ -160,7 +160,7 @@ public sealed class ScheduleDayColumnTests
             .Add(p => p.Date, Monday)
             .Add(p => p.Episodes, [
                 Episode(1),
-                Episode(2) with { Catalog = new CatalogOverlayItem(9, 2, AnimeCatalog.Models.CatalogStatus.Watching, 1, null, 12) }
+                Episode(2) with { Catalog = new CatalogOverlayItem(9, 2, Models.CatalogStatus.Watching, 1, null, 12) }
             ])
             .Add(p => p.DimUncataloged, true));
 

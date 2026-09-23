@@ -139,12 +139,9 @@ public sealed class SupabaseRestServiceTests
 
         public HttpRequestMessage? LastRequest { get; private set; }
 
-        public List<Uri> RequestedUris { get; } = [];
-
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequest = request;
-            RequestedUris.Add(request.RequestUri!);
             return Task.FromResult(_handler(request));
         }
     }

@@ -24,9 +24,9 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        cut.FindAll(".status-picker__option")
+        await cut.FindAll(".status-picker__option")
             .Single(button => button.TextContent.Contains("Completed", StringComparison.Ordinal))
-            .Click();
+            .ClickAsync();
 
         Assert.Equal(25, model.EpisodesWatched);
         Assert.Equal(CatalogStatus.Completed, model.Status);
@@ -44,10 +44,10 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        Status(cut, "Completed").Click();
+        await Status(cut, "Completed").ClickAsync();
         Assert.Equal(25, model.EpisodesWatched);
 
-        Status(cut, "Watching").Click();
+        await Status(cut, "Watching").ClickAsync();
 
         Assert.Equal(24, model.EpisodesWatched);
         Assert.Equal(CatalogStatus.Watching, model.Status);
@@ -66,8 +66,8 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        Status(cut, "Completed").Click();
-        Status(cut, label).Click();
+        await Status(cut, "Completed").ClickAsync();
+        await Status(cut, label).ClickAsync();
 
         Assert.Equal(24, model.EpisodesWatched);
     }
@@ -85,7 +85,7 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        Status(cut, "Watching").Click();
+        await Status(cut, "Watching").ClickAsync();
 
         Assert.Equal(0, model.EpisodesWatched);
     }
@@ -126,14 +126,14 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        cut.FindAll(".status-picker__option")
+        await cut.FindAll(".status-picker__option")
             .Single(button => button.TextContent.Contains("Completed", StringComparison.Ordinal))
-            .Click();
+            .ClickAsync();
 
         // The picker offers no range while Completed, so nothing else would catch the drift.
-        cut.FindAll("input[type=number]")
+        await cut.FindAll("input[type=number]")
             .First(input => input.GetAttribute("value") == "25")
-            .Change("26");
+            .ChangeAsync("26");
 
         Assert.Equal(26, model.Episodes);
         Assert.Equal(26, model.EpisodesWatched);
@@ -153,9 +153,9 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        cut.FindAll("input[type=number]")
+        await cut.FindAll("input[type=number]")
             .First(input => input.GetAttribute("value") == "25")
-            .Change("12");
+            .ChangeAsync("12");
 
         Assert.Equal(12, model.Episodes);
         Assert.Equal(11, model.EpisodesWatched);
@@ -175,13 +175,13 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        cut.FindAll(".episode-picker__option")[^1].Click();
+        await cut.FindAll(".episode-picker__option")[^1].ClickAsync();
 
         Assert.Equal(25, model.EpisodesWatched);
         Assert.Equal(CatalogStatus.Completed, model.Status);
         Assert.Empty(cut.FindAll(".episode-picker__option"));
 
-        Status(cut, "Watching").Click();
+        await Status(cut, "Watching").ClickAsync();
 
         Assert.Equal(24, model.EpisodesWatched);
         Assert.NotEmpty(cut.FindAll(".episode-picker__option"));
@@ -198,7 +198,7 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        cut.FindAll(".episode-picker__option")[24].Click();
+        await cut.FindAll(".episode-picker__option")[24].ClickAsync();
 
         Assert.Equal(24, model.EpisodesWatched);
         Assert.Equal(CatalogStatus.Watching, model.Status);
@@ -234,13 +234,13 @@ public sealed class AnimeEditorFormTests
 
         Assert.NotEmpty(cut.FindAll(".episode-picker__option"));
 
-        Status(cut, "Completed").Click();
+        await Status(cut, "Completed").ClickAsync();
 
         // Label and all: Completed plus the Episodes field already state the count.
         Assert.Empty(cut.FindAll(".episode-picker__option"));
         Assert.DoesNotContain("Episodes watched", cut.Markup);
 
-        Status(cut, "Watching").Click();
+        await Status(cut, "Watching").ClickAsync();
 
         Assert.NotEmpty(cut.FindAll(".episode-picker__option"));
         Assert.Contains("Episodes watched", cut.Markup);
@@ -258,7 +258,7 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        Status(cut, "Completed").Click();
+        await Status(cut, "Completed").ClickAsync();
 
         Assert.Equal(Today, model.CompletedAt);
     }
@@ -276,7 +276,7 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        cut.FindAll(".episode-picker__option")[^1].Click();
+        await cut.FindAll(".episode-picker__option")[^1].ClickAsync();
 
         Assert.Equal(CatalogStatus.Completed, model.Status);
         Assert.Equal(Today, model.CompletedAt);
@@ -292,8 +292,8 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        Status(cut, "Completed").Click();
-        Status(cut, "Watching").Click();
+        await Status(cut, "Completed").ClickAsync();
+        await Status(cut, "Watching").ClickAsync();
 
         Assert.Null(model.CompletedAt);
     }
@@ -310,7 +310,7 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        Status(cut, "Watching").Click();
+        await Status(cut, "Watching").ClickAsync();
 
         Assert.Equal(Today, model.StartedAt);
         Assert.Null(model.CompletedAt);
@@ -326,7 +326,7 @@ public sealed class AnimeEditorFormTests
             .Add(p => p.Model, model)
             .Add(p => p.Franchises, Array.Empty<Franchise>()));
 
-        Status(cut, "Completed").Click();
+        await Status(cut, "Completed").ClickAsync();
 
         Assert.Null(model.StartedAt);
     }
@@ -346,10 +346,10 @@ public sealed class AnimeEditorFormTests
         // Planned owns neither date, Watching owns a start date, Completed owns both.
         Assert.Empty(cut.FindAll("input[type=date]"));
 
-        Status(cut, "Watching").Click();
+        await Status(cut, "Watching").ClickAsync();
         Assert.Single(cut.FindAll("input[type=date]"));
 
-        Status(cut, "Completed").Click();
+        await Status(cut, "Completed").ClickAsync();
         Assert.Equal(2, cut.FindAll("input[type=date]").Count);
     }
 

@@ -57,7 +57,7 @@ public sealed class AdminAuthChangeTests
 
         await authService.LogoutAsync(Xunit.TestContext.Current.CancellationToken);
 
-        cut.WaitForAssertion(() => Assert.Contains("Authentication required", cut.Markup));
+        await cut.WaitForAssertionAsync(() => Assert.Contains("Authentication required", cut.Markup));
         Assert.True(access.HeldCheckWasCancelled);
     }
 
