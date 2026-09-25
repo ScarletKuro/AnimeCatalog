@@ -4,7 +4,7 @@ using AnimeCatalog.ViewModels;
 namespace AnimeCatalog.Infrastructure;
 
 /// <summary>
-/// The catalog page's four pieces of state - search text, status, sort and page - as an address,
+/// The catalog page's pieces of state - search text, view, status, sort and page - as an address,
 /// and back again.
 /// </summary>
 /// <remarks>
@@ -12,18 +12,24 @@ namespace AnimeCatalog.Infrastructure;
 /// <see cref="LoginLink"/> is: the result has to be base-relative for the sub-path the app is
 /// served from, unrelated query parameters must be dropped rather than carried along, and the
 /// parameter order has to be fixed. That last one is load-bearing - it makes the canonical form a
-/// total function of the four values, which is what lets Catalog.razor compare the address it was
+/// total function of the catalog state, which is what lets Catalog.razor compare the address it was
 /// given against the address it wants and converge in a single redirect.
 /// </remarks>
 public static class CatalogUrl
 {
     private const string Path = "catalog";
 
-    /// <summary>The canonical address for these four values. Defaults are left out entirely.</summary>
-    public static string For(string query, CatalogStatus? status, CatalogSortOption sort, int page)
+    /// <summary>The canonical address for these values. Defaults are left out entirely.</summary>
+    public static string For(
+        string query,
+        CatalogStatus? status,
+        CatalogSortOption sort,
+        int page,
+        CatalogViewMode? view = null)
     {
-        var parts = new List<string>(4);
+        var parts = new List<string>(5);
         Append(parts, "q", QueryText(query), escape: true);
+        Append(parts, "view", ViewText(view), escape: false);
         Append(parts, "status", StatusText(status), escape: false);
         Append(parts, "sort", SortText(sort), escape: false);
         Append(parts, "page", PageText(page), escape: false);
@@ -31,7 +37,7 @@ public static class CatalogUrl
         return parts.Count == 0 ? Path : $"{Path}?{string.Join('&', parts)}";
     }
 
-    // Each of the four returns null for its default value, so a catalog nobody has filtered stays a
+    // Each query piece returns null for its default value, so a catalog nobody has filtered stays a
     // clean "catalog" rather than growing "?q=&sort=Title&page=1". These are also what the page
     // compares its raw parameters against, so they are the definition of canonical, not a cosmetic
     // tidy-up.
@@ -43,6 +49,13 @@ public static class CatalogUrl
     /// </summary>
     public static string? QueryText(string query) => query.Length == 0 ? null : query;
 
+    public static string? ViewText(CatalogViewMode? view) =>
+        view switch
+        {
+            CatalogViewMode.Franchises => "franchises",
+            _ => null
+        };
+
     public static string? StatusText(CatalogStatus? status) => status?.ToApiValue();
 
     public static string? SortText(CatalogSortOption sort) =>
@@ -52,6 +65,12 @@ public static class CatalogUrl
 
     /// <summary>Never trimmed, and never null: an absent ?q= and an empty one are the same box.</summary>
     public static string ParseQuery(string? raw) => raw ?? string.Empty;
+
+    /// <summary>An unknown view is dropped rather than thrown, and reads as the default catalog.</summary>
+    public static CatalogViewMode? ParseView(string? raw) =>
+        string.Equals(raw, "franchises", StringComparison.OrdinalIgnoreCase)
+            ? CatalogViewMode.Franchises
+            : null;
 
     /// <summary>An unknown status is dropped rather than thrown, and reads as "All".</summary>
     public static CatalogStatus? ParseStatus(string? raw) =>

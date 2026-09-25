@@ -26,6 +26,23 @@ public sealed class HomeTests
         });
     }
 
+    [Fact]
+    public async Task MostWatchedFranchises_LinksToTheFranchiseCatalogView()
+    {
+        await using var context = CreateContext();
+
+        var cut = context.Render<Home>();
+
+        await cut.WaitForAssertionAsync(() =>
+        {
+            var link = cut.FindAll("#home-franchises ~ a")
+                .Single(anchor => anchor.TextContent.Contains("All franchises", StringComparison.Ordinal));
+
+            Assert.Equal("catalog?view=franchises&sort=MostWatched", link.GetAttribute("href"));
+            Assert.Contains("button--inline", link.GetAttribute("class"));
+        });
+    }
+
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();
@@ -83,7 +100,7 @@ public sealed class HomeTests
                 "anime_entries" => AnimeRows().Cast<T>(),
                 "catalog_entries" => CatalogRows().Cast<T>(),
                 "anime_relations" => [],
-                "franchises" => [],
+                "franchises" => FranchiseRows().Cast<T>(),
                 _ => throw new NotSupportedException(table)
             };
 
@@ -123,10 +140,23 @@ public sealed class HomeTests
             CatalogEntry(2, animeEntryId: 2, updatedAt: _now.AddMinutes(-5))
         ];
 
+        private static IReadOnlyList<FranchiseRow> FranchiseRows() =>
+        [
+            new()
+            {
+                Id = 7,
+                Title = "Seed Franchise",
+                Slug = "seed-franchise",
+                CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+            }
+        ];
+
         private static AnimeEntryRow Entry(long id, string title, int episodes) => new()
         {
             Id = id,
             AniListId = 1000 + (int)id,
+            FranchiseId = 7,
             TitleRomaji = title,
             Episodes = episodes,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),

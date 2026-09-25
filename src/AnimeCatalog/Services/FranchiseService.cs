@@ -78,6 +78,11 @@ public sealed class FranchiseService
             .Cast<FranchiseSummaryViewModel>()
             .ToList();
 
+        if (filters.View == CatalogViewMode.Franchises)
+        {
+            grouped = grouped.Where(item => item.FranchiseId is not null).ToList();
+        }
+
         return ApplySort(grouped, filters.Sort);
     }
 
@@ -712,6 +717,7 @@ public sealed class FranchiseService
         return sort switch
         {
             CatalogSortOption.ScoreDescending => items.OrderByDescending(item => item.AverageScore ?? -1).ThenBy(item => item.Title).ToList(),
+            CatalogSortOption.MostWatched => items.OrderByDescending(item => item.CompletedCount).ThenByDescending(item => item.EntryCount).ThenBy(item => item.Title).ToList(),
             CatalogSortOption.RecentlyAdded => items.OrderByDescending(item => item.Entries.Max(entry => entry.CatalogEntry.CreatedAt)).ThenBy(item => item.Title).ToList(),
             CatalogSortOption.RecentlyCompleted => items.OrderByDescending(item => item.Entries.Max(entry => entry.CatalogEntry.CompletedAt?.ToDateTime(TimeOnly.MinValue))).ThenBy(item => item.Title).ToList(),
             CatalogSortOption.Year => items.OrderByDescending(item => item.Entries.Max(entry => entry.AnimeEntry.SeasonYear)).ThenBy(item => item.Title).ToList(),

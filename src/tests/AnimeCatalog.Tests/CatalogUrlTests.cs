@@ -19,8 +19,8 @@ public sealed class CatalogUrlTests
     public void For_OrdersTheParametersDeterministically()
     {
         Assert.Equal(
-            "catalog?q=steins&status=watching&sort=Year&page=3",
-            CatalogUrl.For("steins", CatalogStatus.Watching, CatalogSortOption.Year, 3));
+            "catalog?q=steins&view=franchises&status=watching&sort=Year&page=3",
+            CatalogUrl.For("steins", CatalogStatus.Watching, CatalogSortOption.Year, 3, CatalogViewMode.Franchises));
     }
 
     [Fact]
@@ -52,7 +52,17 @@ public sealed class CatalogUrlTests
         }
 
         Assert.Equal("steins;gate", CatalogUrl.ParseQuery(CatalogUrl.QueryText("steins;gate")));
+        Assert.Equal(CatalogViewMode.Franchises, CatalogUrl.ParseView(CatalogUrl.ViewText(CatalogViewMode.Franchises)));
         Assert.Equal(7, CatalogUrl.ParsePage(CatalogUrl.PageText(7)));
+    }
+
+    [Theory]
+    [InlineData("bogus")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void ParseView_FallsBackToTheDefaultCatalogForAnythingItDoesNotRecognise(string? raw)
+    {
+        Assert.Null(CatalogUrl.ParseView(raw));
     }
 
     [Theory]

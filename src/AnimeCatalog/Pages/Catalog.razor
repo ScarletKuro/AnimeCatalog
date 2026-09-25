@@ -65,6 +65,7 @@
                 <select class="select-input" value="@_sort" @onchange="OnSortChanged">
                     <option value="@CatalogSortOption.Title">Title</option>
                     <option value="@CatalogSortOption.ScoreDescending">Score descending</option>
+                    <option value="@CatalogSortOption.MostWatched">Most watched</option>
                     <option value="@CatalogSortOption.RecentlyAdded">Recently added</option>
                     <option value="@CatalogSortOption.RecentlyCompleted">Recently completed</option>
                     <option value="@CatalogSortOption.Year">Year</option>
@@ -185,6 +186,9 @@
     [SupplyParameterFromQuery(Name = "q")]
     private string? QueryParam { get; set; }
 
+    [SupplyParameterFromQuery(Name = "view")]
+    private string? ViewParam { get; set; }
+
     [SupplyParameterFromQuery(Name = "status")]
     private string? StatusParam { get; set; }
 
@@ -194,9 +198,10 @@
     [SupplyParameterFromQuery(Name = "page")]
     private string? PageParam { get; set; }
 
-    // Mirrors of the four parameters. A [Parameter] is never written to, and the controls have to
+    // Mirrors of the query parameters. A [Parameter] is never written to, and the controls have to
     // render from something that survives the round trip a keystroke makes through the address bar.
     private string _query = string.Empty;
+    private CatalogViewMode? _view;
     private CatalogStatus? _status;
     private string _statusText = string.Empty; // "" is what the <select> needs for "All".
     private CatalogSortOption _sort = CatalogSortOption.Title;
@@ -308,11 +313,12 @@
         }
     }
 
-    // Re-fires on every same-component navigation, which is how all four values arrive: the filters
+    // Re-fires on every same-component navigation, which is how all query values arrive: the filters
     // card, the pager, a pasted link and the Back button all funnel through here.
     protected override Task OnParametersSetAsync()
     {
         var query = CatalogUrl.ParseQuery(QueryParam);
+        var view = CatalogUrl.ParseView(ViewParam);
         var status = CatalogUrl.ParseStatus(StatusParam);
         var sort = CatalogUrl.ParseSort(SortParam);
         var page = CatalogUrl.ParsePage(PageParam);
@@ -325,6 +331,7 @@
         // the same allowed re-entry ArchiveCalendar leans on, and why the redirect is unguarded.
         var needsCanonicalUrl =
             !string.Equals(QueryParam, CatalogUrl.QueryText(query), StringComparison.Ordinal)
+            || !string.Equals(ViewParam, CatalogUrl.ViewText(view), StringComparison.Ordinal)
             || !string.Equals(StatusParam, CatalogUrl.StatusText(status), StringComparison.Ordinal)
             || !string.Equals(SortParam, CatalogUrl.SortText(sort), StringComparison.Ordinal)
             || !string.Equals(PageParam, CatalogUrl.PageText(page), StringComparison.Ordinal);
@@ -333,16 +340,17 @@
         {
             // Replaces rather than pushes: an address this page had to correct is not somewhere Back
             // should be able to return to.
-            NavigationManager.NavigateTo(CatalogUrl.For(query, status, sort, page), replace: true);
+            NavigationManager.NavigateTo(CatalogUrl.For(query, status, sort, page, view), replace: true);
         }
 
         _query = query;
+        _view = view;
         _status = status;
         _statusText = CatalogUrl.StatusText(status) ?? string.Empty;
         _sort = sort;
         _page = page;
 
-        var filterKey = $"{query}|{status}|{sort}";
+        var filterKey = $"{query}|{view}|{status}|{sort}";
 
         if (_filterKey == filterKey)
         {
@@ -390,7 +398,7 @@
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
 
-        var filters = new CatalogFilters { Query = _query, Status = _status, Sort = _sort };
+        var filters = new CatalogFilters { Query = _query, View = _view, Status = _status, Sort = _sort };
         var loaded = false;
 
         try
@@ -436,7 +444,7 @@
         // sits inside the range.
         if (loaded && CurrentPage != _page)
         {
-            NavigationManager.NavigateTo(CatalogUrl.For(_query, _status, _sort, CurrentPage), replace: true);
+            NavigationManager.NavigateTo(CatalogUrl.For(_query, _status, _sort, CurrentPage, _view), replace: true);
         }
     }
 
@@ -464,7 +472,7 @@
     }
 
     private void Navigate(string query, CatalogStatus? status, CatalogSortOption sort, int page, bool replace) =>
-        NavigationManager.NavigateTo(CatalogUrl.For(query, status, sort, page), replace: replace);
+        NavigationManager.NavigateTo(CatalogUrl.For(query, status, sort, page, _view), replace: replace);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

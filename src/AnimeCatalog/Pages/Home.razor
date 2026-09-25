@@ -218,7 +218,7 @@
             <section class="panel" aria-labelledby="home-franchises">
                 <div class="panel__header">
                     <h2 id="home-franchises">Most-watched franchises</h2>
-                    <NavLink href="catalog" class="button button--inline">All franchises</NavLink>
+                    <NavLink href="catalog?view=franchises&sort=MostWatched" class="button button--inline">All franchises</NavLink>
                 </div>
                 <div class="franchise-grid">
                     @foreach (var franchise in _summary.TopFranchises)

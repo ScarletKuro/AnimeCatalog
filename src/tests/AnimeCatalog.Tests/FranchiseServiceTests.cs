@@ -38,6 +38,64 @@ public sealed class FranchiseServiceTests
     }
 
     [Fact]
+    public void BuildCatalog_FranchiseViewHidesStandalonePseudoFranchises()
+    {
+        var franchise = new Franchise { Id = 1, Title = "Attack on Titan", Slug = "attack-on-titan" };
+        var entries = new[]
+        {
+            new AnimeEntry { Id = 10, FranchiseId = 1, TitleRomaji = "Shingeki no Kyojin", DisplayOrder = 1 },
+            new AnimeEntry { Id = 20, TitleRomaji = "Standalone Movie", DisplayOrder = 1 }
+        };
+        var catalog = new[]
+        {
+            new CatalogEntry { AnimeEntryId = 10, Status = CatalogStatus.Completed },
+            new CatalogEntry { AnimeEntryId = 20, Status = CatalogStatus.Completed }
+        };
+
+        var result = _service.BuildCatalog(entries, catalog, [], [franchise], new CatalogFilters
+        {
+            View = CatalogViewMode.Franchises
+        });
+
+        Assert.Single(result);
+        Assert.Equal(franchise.Id, result[0].FranchiseId);
+    }
+
+    [Fact]
+    public void BuildCatalog_MostWatchedSortMatchesTheHomeFranchiseRanking()
+    {
+        var low = new Franchise { Id = 1, Title = "Low", Slug = "low" };
+        var high = new Franchise { Id = 2, Title = "High", Slug = "high" };
+        var wide = new Franchise { Id = 3, Title = "Wide", Slug = "wide" };
+        var entries = new[]
+        {
+            new AnimeEntry { Id = 10, FranchiseId = low.Id, TitleRomaji = "Low 1", DisplayOrder = 1 },
+            new AnimeEntry { Id = 20, FranchiseId = high.Id, TitleRomaji = "High 1", DisplayOrder = 1 },
+            new AnimeEntry { Id = 21, FranchiseId = high.Id, TitleRomaji = "High 2", DisplayOrder = 2 },
+            new AnimeEntry { Id = 30, FranchiseId = wide.Id, TitleRomaji = "Wide 1", DisplayOrder = 1 },
+            new AnimeEntry { Id = 31, FranchiseId = wide.Id, TitleRomaji = "Wide 2", DisplayOrder = 2 },
+            new AnimeEntry { Id = 32, FranchiseId = wide.Id, TitleRomaji = "Wide 3", DisplayOrder = 3 }
+        };
+        var catalog = new[]
+        {
+            new CatalogEntry { AnimeEntryId = 10, Status = CatalogStatus.Completed },
+            new CatalogEntry { AnimeEntryId = 20, Status = CatalogStatus.Completed },
+            new CatalogEntry { AnimeEntryId = 21, Status = CatalogStatus.Completed },
+            new CatalogEntry { AnimeEntryId = 30, Status = CatalogStatus.Completed },
+            new CatalogEntry { AnimeEntryId = 31, Status = CatalogStatus.Watching },
+            new CatalogEntry { AnimeEntryId = 32, Status = CatalogStatus.Planned }
+        };
+
+        var result = _service.BuildCatalog(entries, catalog, [], [low, high, wide], new CatalogFilters
+        {
+            View = CatalogViewMode.Franchises,
+            Sort = CatalogSortOption.MostWatched
+        });
+
+        Assert.Equal(["High", "Wide", "Low"], result.Select(item => item.Title));
+    }
+
+    [Fact]
     public void BuildCatalog_ThrowsWhenCatalogEntryIsMissing()
     {
         var entries =

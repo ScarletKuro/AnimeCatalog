@@ -349,6 +349,29 @@ public sealed class CatalogTests
     }
 
     [Fact]
+    public async Task AnUnknownViewQueryIsDroppedInsteadOfThrowing()
+    {
+        await using var context = CreateSeededContext(130, out _);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+
+        var cut = RenderCatalog(context, "catalog?view=bogus");
+
+        Assert.EndsWith("catalog", navigation.Uri);
+        Assert.Equal(TitleFor(1), cut.FindAll(".franchise-card__title")[0].TextContent);
+    }
+
+    [Fact]
+    public async Task AWrongCaseViewQueryIsAcceptedAndCanonicalised()
+    {
+        await using var context = CreateSeededContext(130, out _);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+
+        RenderCatalog(context, "catalog?view=Franchises");
+
+        Assert.EndsWith("catalog?view=franchises", navigation.Uri);
+    }
+
+    [Fact]
     public async Task ALowercaseSortQueryIsAcceptedAndCanonicalised()
     {
         await using var context = CreateSeededContext(130, out _);
@@ -358,6 +381,18 @@ public sealed class CatalogTests
 
         Assert.EndsWith("catalog?sort=Year", navigation.Uri);
         Assert.Equal("Year", cut.FindAll(".filters-card select")[1].GetAttribute("value"));
+    }
+
+    [Fact]
+    public async Task AMostWatchedSortQueryIsAcceptedAndCanonicalised()
+    {
+        await using var context = CreateSeededContext(130, out _);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+
+        var cut = RenderCatalog(context, "catalog?view=franchises&sort=mostwatched");
+
+        Assert.EndsWith("catalog?view=franchises&sort=MostWatched", navigation.Uri);
+        Assert.Equal("MostWatched", cut.FindAll(".filters-card select")[1].GetAttribute("value"));
     }
 
     [Fact]
@@ -381,6 +416,18 @@ public sealed class CatalogTests
         await cut.Find(".filters-card input").InputAsync(TitleFor(7));
 
         await cut.WaitForAssertionAsync(() => Assert.EndsWith($"catalog?q={TitleFor(7)}", navigation.Uri));
+    }
+
+    [Fact]
+    public async Task FilterChangesPreserveTheViewQuery()
+    {
+        await using var context = CreateSeededContext(130, out _);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+
+        var cut = RenderCatalog(context, "catalog?view=franchises&page=3");
+        await cut.Find(".filters-card input").InputAsync(TitleFor(7));
+
+        await cut.WaitForAssertionAsync(() => Assert.EndsWith($"catalog?q={TitleFor(7)}&view=franchises", navigation.Uri));
     }
 
     [Fact]
@@ -432,7 +479,7 @@ public sealed class CatalogTests
     private static IRenderedComponent<Catalog> RenderCatalog(BunitContext context, string url = "catalog")
     {
         // Navigated before rendering rather than only parameterised: a component rendered directly
-        // sits at the base address, and the page reads all four of its values out of the query.
+        // sits at the base address, and the page reads its state out of the query.
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(url);
 
         var cut = context.Render<Catalog>();
