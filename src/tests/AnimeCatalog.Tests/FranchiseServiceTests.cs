@@ -168,11 +168,16 @@ public sealed class FranchiseServiceTests
     {
         var one = Grouped(1, "One", "one", Item(1, "a", CatalogStatus.Completed));
         var two = Grouped(2, "Two", "two", Item(2, "b", CatalogStatus.Completed), Item(3, "c", CatalogStatus.Completed));
-        var loose = Standalone(Item(4, "d", CatalogStatus.Completed));
+        var three = Grouped(3, "Three", "three", Item(4, "d", CatalogStatus.Completed));
+        var four = Grouped(4, "Four", "four", Item(5, "e", CatalogStatus.Completed));
+        var five = Grouped(5, "Five", "five", Item(6, "f", CatalogStatus.Completed));
+        var six = Grouped(6, "Six", "six", Item(7, "g", CatalogStatus.Completed));
+        var seven = Grouped(7, "Seven", "seven", Item(8, "h", CatalogStatus.Completed));
+        var loose = Standalone(Item(9, "i", CatalogStatus.Completed));
 
-        var result = _service.BuildHomeSummary([one, two, loose], Now);
+        var result = _service.BuildHomeSummary([one, two, three, four, five, six, seven, loose], Now);
 
-        Assert.Equal(["two", "one"], result.TopFranchises.Select(item => item.Slug));
+        Assert.Equal(["two", "five", "four", "one", "seven"], result.TopFranchises.Select(item => item.Slug));
         Assert.All(result.TopFranchises, item => Assert.NotNull(item.Slug));
     }
 

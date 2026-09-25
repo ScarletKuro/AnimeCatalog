@@ -642,7 +642,7 @@ public sealed class FranchiseService
                 .OrderByDescending(item => item.CompletedCount)
                 .ThenByDescending(item => item.EntryCount)
                 .ThenBy(item => item.Title)
-                .Take(4)
+                .Take(5)
                 .ToList()
         };
     }
