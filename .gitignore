@@ -344,3 +344,11 @@ __pycache__/
 
 # Cake - Uncomment if you are using it
 # tools/
+
+# Scarlet.Tailwind downloaded runtime
+/tools/*
+!/tools/.gitkeep
+
+# Generated stylesheet by Tailwind
+/src/AnimeCatalog/wwwroot/css/app.css
+/src/AnimeCatalog/wwwroot/css/app.css.map

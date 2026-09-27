@@ -7,14 +7,10 @@
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
   </PropertyGroup>
 
-  <PropertyGroup Label="Tailwind.Hosting.Build Props">
-    <TailwindVersion>latest</TailwindVersion>
-    <TailwindWatch>true</TailwindWatch>
-    <TailwindInputCssFile>wwwroot/css/styles.css</TailwindInputCssFile>
-    <TailwindOutputCssFile>wwwroot/css/app.css</TailwindOutputCssFile>
-    <TailwindConfigFile>tailwind.config.js</TailwindConfigFile>
-    <TailwindMinifyOnPublish>true</TailwindMinifyOnPublish>
-    <TailwindExcludeInputFileOnPublish>true</TailwindExcludeInputFileOnPublish>
+  <PropertyGroup Label="Scarlet.Tailwind">
+    <TailwindRuntimeDownload>true</TailwindRuntimeDownload>
+    <TailwindVersionDownload>4.3.3</TailwindVersionDownload>
+    <TailwindRuntimeDirectory>$(MSBuildProjectDirectory)/../../tools</TailwindRuntimeDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,28 +23,20 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.6" PrivateAssets="all" />
-    <PackageReference Include="Tailwind.Hosting" Version="1.2.4" />
-    <PackageReference Include="Tailwind.Hosting.Build" Version="1.2.4">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <PackageReference Include="Scarlet.Tailwind.MSBuild" Version="1.0.0" PrivateAssets="all" />
   </ItemGroup>
 
-  <!--
-    Drop the Tailwind-generated stylesheet from the default wwwroot Content glob at
-    EVALUATION time. Tailwind.Hosting.Build re-adds it from its TailwindGenerateOutput
-    target (CopyToPublishDirectory="Always"), so without this removal the SDK sees two
-    assets for 'css/app#[.{fingerprint}]?.css' and fails with "Two assets found targeting
-    the same path with incompatible asset kinds".
-
-    This must stay an evaluation-time ItemGroup, NOT a target. A `<Target ...
-    BeforeTargets="PrepareForBuild">` doing the same Remove ran after the package's re-add
-    on Linux (while winning the race on Windows), stripping app.css from the publish output
-    and deploying a stylesheet-less site to GitHub Pages. The package removes its own input
-    file the same way.
-  -->
   <ItemGroup>
-    <Content Remove="$(TailwindOutputCssFile)" />
+    <TailwindBeforeStaticWebAssets Include="Styles/app.css">
+      <OutputPath>wwwroot/css/app.css</OutputPath>
+      <Map Condition="'$(Configuration)' == 'Debug'">%(OutputPath).map</Map>
+    </TailwindBeforeStaticWebAssets>
+
+    <Watch Include="Styles\**\*.css" />
+    <Watch Include="**\*.razor" />
+    <Watch Include="**\*.cshtml" />
+    <Watch Include="**\*.html" />
+    <Watch Include="wwwroot\**\*.js" />
   </ItemGroup>
 
 </Project>
