@@ -32,11 +32,7 @@
       <Map Condition="'$(Configuration)' == 'Debug'">%(OutputPath).map</Map>
     </TailwindBeforeStaticWebAssets>
 
-    <Watch Include="Styles\**\*.css" />
-    <Watch Include="**\*.razor" />
-    <Watch Include="**\*.cshtml" />
-    <Watch Include="**\*.html" />
-    <Watch Include="wwwroot\**\*.js" />
+    <Watch Include="Styles\**\*.css;**\*.razor;**\*.razor.cs;**\*.cshtml;**\*.html;wwwroot\**\*.js" />
   </ItemGroup>
 
 </Project>
