@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "scarlet.tailwind.cli": {
+      "version": "4.3.3.1",
+      "commands": [
+        "dotnet-tailwind"
+      ],
+      "rollForward": false
+    }
+  }
+}
